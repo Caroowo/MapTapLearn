@@ -144,18 +144,15 @@ function refreshMenu() {
   const size = poolSize(state.difficulty, country.count);
   refreshRoundSlider(country, size);
 
-  const pick = size === country.count
-    ? `all ${size} places`
-    : `its ${size} biggest places`;
-  ui.menuSummary.textContent = isCustomRun()
-    ? `${country.name} · ${state.rounds} places drawn from ${pick}.`
-    : `${country.name} · ${pick}, in a random order.`;
+  ui.menuSummary.textContent = state.rounds === country.count
+    ? `${country.name} · all ${state.rounds} places, in a random order.`
+    : `${country.name} · its ${state.rounds} biggest places, in a random order.`;
 
   const best = bestFor(currentSetup(country));
   const practice = isCustomRun();
   ui.menuBest.classList.toggle('is-practice', practice);
   if (practice) {
-    ui.menuBest.textContent = 'Practice run — a short game sets no record';
+    ui.menuBest.textContent = 'Practice run — a shortened game sets no record';
   } else {
     ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
   }
@@ -208,10 +205,11 @@ async function startGame() {
     return;
   }
 
-  // Shuffle first, then cut: a short run is a random slice of the pool, not its
-  // biggest few — those are what the easier difficulty already plays.
+  // Cut first, then shuffle: a short run is the biggest places of the pool, in a
+  // random order. Slicing a pool that is already sorted by population is what
+  // makes "25 rounds" mean the 25 biggest rather than 25 arbitrary ones.
   const custom = isCustomRun();
-  const targets = roundOrder(pool(country, state.difficulty)).slice(0, state.rounds);
+  const targets = roundOrder(pool(country, state.difficulty).slice(0, state.rounds));
   state.game = {
     country,
     // Pinned at kick-off: the menu can be re-set before the summary is filed.
