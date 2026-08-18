@@ -113,14 +113,24 @@ const nameToCode = (() => {
   return map;
 })();
 
-function toCountryCode(value) {
-  if (typeof value !== 'string' || !value) return null;
-  const trimmed = value.trim();
-  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
-  // Border-straddling entries ("Nepal/China", "Argentina/Chile") belong to no
-  // single country, and this game asks you to place a pin inside one.
-  if (trimmed.includes('/')) return null;
-  return nameToCode.get(foldCountryName(trimmed)) ?? null;
+/**
+ * Border-straddling entries ("Nepal/China", "Argentina/Chile") name more than
+ * one country, and Everest really is in both — such a place is emitted once per
+ * country so it can come up in either one's rounds.
+ * @returns {string[]} ISO codes, empty when nothing resolves.
+ */
+function toCountryCodes(value) {
+  if (typeof value !== 'string' || !value) return [];
+  const codes = new Set();
+  for (const part of value.split('/')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const code = /^[A-Za-z]{2}$/.test(trimmed)
+      ? trimmed.toUpperCase()
+      : nameToCode.get(foldCountryName(trimmed));
+    if (code) codes.add(code);
+  }
+  return [...codes];
 }
 
 function toNumber(value) {
@@ -135,22 +145,34 @@ function toNumber(value) {
  * is the answer here, so leaving it in the prompt gives the round away. Only
  * country segments go; "Akron, Ohio" keeps the state that tells it apart from
  * the other Akrons.
+ *
+ * The suffix is also a second source of countries: for eight places the label is
+ * the only place the border shows up ("Mount Everest, Nepal/China" carries
+ * country: "China"), so the countries it names come back with the trimmed label.
  */
-function stripCountrySuffix(label, code) {
+function splitCountrySuffix(label, codes) {
   const parts = label.split(',');
-  while (parts.length > 1 && toCountryCode(parts[parts.length - 1].trim()) === code) {
+  const named = new Set(codes);
+  while (parts.length > 1) {
+    const tail = toCountryCodes(parts[parts.length - 1].trim());
+    // Only a suffix naming this record's own country is a country suffix.
+    if (!tail.some((code) => codes.includes(code))) break;
+    for (const code of tail) named.add(code);
     parts.pop();
   }
-  return parts.join(',').trim() || label;
+  return { name: parts.join(',').trim() || label, countries: [...named] };
 }
 
-/** @returns {{name,lat,lon,pop,country}|null} */
+/**
+ * @returns {Array<{name,lat,lon,pop,country}>} one record per country the place
+ * belongs to — usually one, more when it sits on a border.
+ */
 function normalize(raw) {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object') return [];
   const flat = { ...raw, ...(raw.properties ?? {}), ...(raw.attributes ?? {}) };
 
   // maptap.gg ships retired entries in the same pool, flagged rather than removed.
-  if (flat.disabled === true || flat.enabled === false) return null;
+  if (flat.disabled === true || flat.enabled === false) return [];
 
   let lat = toNumber(pick(flat, KEYS.lat));
   let lon = toNumber(pick(flat, KEYS.lon));
@@ -160,32 +182,33 @@ function normalize(raw) {
     lon = toNumber(coords[0]);
     lat = toNumber(coords[1]);
   }
-  if (lat === null || lon === null) return null;
-  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  if (lat === null || lon === null) return [];
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return [];
 
   const name = pick(flat, KEYS.name);
-  if (typeof name !== 'string' || !name.trim()) return null;
+  if (typeof name !== 'string' || !name.trim()) return [];
 
-  const country = toCountryCode(pick(flat, KEYS.country));
-  if (!country) return null;
+  const countries = toCountryCodes(pick(flat, KEYS.country));
+  if (!countries.length) return [];
 
+  const suffix = splitCountrySuffix(name.trim(), countries);
   const pop = toNumber(pick(flat, KEYS.pop));
-  return {
-    name: stripCountrySuffix(name.trim(), country),
+  const place = {
+    name: suffix.name,
     lat: round(lat, 4),
     lon: round(lon, 4),
     // No population on a record means "least relevant", not "excluded".
     pop: pop && pop > 0 ? Math.round(pop) : 1,
-    country,
   };
+  return suffix.countries.map((country) => ({ ...place, country }));
 }
 
 /** Walks any JSON blob and collects everything that looks like a location. */
 function harvest(value, found = [], depth = 0) {
   if (depth > 12 || value === null || typeof value !== 'object') return found;
-  const hit = normalize(value);
-  if (hit) {
-    found.push(hit);
+  const hits = normalize(value);
+  if (hits.length) {
+    found.push(...hits);
     return found;
   }
   for (const child of Array.isArray(value) ? value : Object.values(value)) {
@@ -276,9 +299,9 @@ function locationsFromHtmlTable(html) {
   for (const row of rows.slice(1)) {
     const values = cells(row[1]);
     if (values.length !== header.length) continue;
-    found.push(normalize(Object.fromEntries(header.map((h, i) => [h, values[i]]))));
+    found.push(...normalize(Object.fromEntries(header.map((h, i) => [h, values[i]]))));
   }
-  return found.filter(Boolean);
+  return found;
 }
 
 /* ------------------------------------------------- main */

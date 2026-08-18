@@ -48,7 +48,10 @@ data/countries/DE.json     # { code, name, bbox, locations: [{ name, lat, lon, p
 ```
 
 Locations are sorted by population descending (that ordering *is* the difficulty
-mechanic) and capped at 300 per country so no round pulls a large file.
+mechanic) and capped at 700 per country so no round pulls a large file. The cap
+is a guard rail rather than curation — places with no population sort last, so a
+cap tighter than the biggest country deletes landmarks (at 300 the US lost
+Alcatraz, China the Forbidden City and Everest) rather than trimming filler.
 
 ### Sources
 
