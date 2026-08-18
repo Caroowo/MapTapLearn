@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>MapTap Learn</title>
+<meta name="description" content="Learn the world map by dropping pins. Pick a country, guess where its places are, get scored 1-100." />
+<meta name="color-scheme" content="dark" />
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css" />
+<link rel="stylesheet" href="assets/css/style.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📍</text></svg>" />
+</head>
+<body>
+  <div id="map" aria-label="World map"></div>
+
+  <!-- Heads-up display, shown while a round is running -->
+  <header id="hud" class="hud" hidden>
+    <div class="hud-left">
+      <button id="btn-quit" class="icon-btn" type="button" title="Back to menu" aria-label="Back to menu">✕</button>
+      <div class="hud-meta">
+        <span id="hud-country" class="hud-country"></span>
+        <span id="hud-progress" class="hud-progress"></span>
+      </div>
+    </div>
+    <div class="hud-target">
+      <span class="hud-label">Find</span>
+      <h1 id="hud-place" class="hud-place"></h1>
+    </div>
+    <div class="hud-right">
+      <span class="hud-label">Score</span>
+      <span id="hud-score" class="hud-score">0</span>
+    </div>
+  </header>
+
+  <!-- Action bar: confirm guess / continue -->
+  <div id="actionbar" class="actionbar" hidden>
+    <p id="action-hint" class="action-hint">Click the map to place your pin</p>
+    <button id="btn-confirm" class="btn btn-primary" type="button" disabled>Confirm guess</button>
+  </div>
+
+  <!-- Result of a single round -->
+  <section id="result" class="panel result" hidden aria-live="polite">
+    <div class="result-score">
+      <span id="result-points" class="result-points">0</span>
+      <span class="result-outof">/ 100</span>
+    </div>
+    <p id="result-verdict" class="result-verdict"></p>
+    <p id="result-distance" class="result-distance"></p>
+    <button id="btn-next" class="btn btn-primary" type="button">Next</button>
+  </section>
+
+  <!-- Menu / setup -->
+  <section id="menu" class="overlay">
+    <div class="panel menu">
+      <div class="brand">
+        <span class="brand-pin">📍</span>
+        <div>
+          <h1 class="brand-title">MapTap <em>Learn</em></h1>
+          <p class="brand-sub">Drop a pin. Learn the world.</p>
+        </div>
+      </div>
+
+      <nav class="modes" aria-label="Game mode">
+        <button class="mode is-active" type="button" data-mode="countries">Countries</button>
+        <button class="mode" type="button" disabled title="Coming soon">Capitals <span class="soon">soon</span></button>
+        <button class="mode" type="button" disabled title="Coming soon">World <span class="soon">soon</span></button>
+      </nav>
+
+      <div class="field">
+        <label for="country-search">Country</label>
+        <input id="country-search" type="search" placeholder="Search countries…" autocomplete="off" spellcheck="false" />
+        <ul id="country-list" class="country-list" role="listbox" aria-label="Countries"></ul>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Difficulty</span>
+        <div class="segmented" role="radiogroup" aria-label="Difficulty">
+          <button type="button" class="seg is-active" data-difficulty="easy" role="radio" aria-checked="true">
+            <strong>Easy</strong><small id="pool-easy">top 10</small>
+          </button>
+          <button type="button" class="seg" data-difficulty="medium" role="radio" aria-checked="false">
+            <strong>Medium</strong><small id="pool-medium">top half</small>
+          </button>
+          <button type="button" class="seg" data-difficulty="hard" role="radio" aria-checked="false">
+            <strong>Hard</strong><small id="pool-hard">everything</small>
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">Rounds</span>
+        <div class="segmented" role="radiogroup" aria-label="Rounds">
+          <button type="button" class="seg is-active" data-rounds="5" role="radio" aria-checked="true">5</button>
+          <button type="button" class="seg" data-rounds="10" role="radio" aria-checked="false">10</button>
+          <button type="button" class="seg" data-rounds="20" role="radio" aria-checked="false">20</button>
+        </div>
+      </div>
+
+      <p id="menu-summary" class="menu-summary"></p>
+      <button id="btn-start" class="btn btn-primary btn-block" type="button" disabled>Pick a country</button>
+      <p class="credit">Imagery &copy; Esri &middot; data <span id="data-source">…</span></p>
+    </div>
+  </section>
+
+  <!-- End-of-game summary -->
+  <section id="summary" class="overlay" hidden>
+    <div class="panel">
+      <h2 id="summary-title" class="summary-title">Round up</h2>
+      <div class="summary-total">
+        <span id="summary-avg" class="summary-avg">0</span>
+        <span class="result-outof">avg / 100</span>
+      </div>
+      <p id="summary-line" class="brand-sub"></p>
+      <ol id="summary-list" class="summary-list"></ol>
+      <div class="summary-actions">
+        <button id="btn-again" class="btn btn-primary" type="button">Play again</button>
+        <button id="btn-menu" class="btn" type="button">Change setup</button>
+      </div>
+    </div>
+  </section>
+
+  <script src="vendor/leaflet/leaflet.js"></script>
+  <script type="module" src="assets/js/main.js"></script>
+</body>
+</html>
