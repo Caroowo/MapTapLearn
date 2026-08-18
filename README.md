@@ -46,13 +46,45 @@ scaled to the country: the smallest country in the dataset is ~153 km across, so
 15 km is at most a tenth of any yardstick.
 
 Past that radius, each round scores `100 · e^(−4 · (distance − 15 km) /
-countrySize)`, clamped to 1–100, where `countrySize` is the diagonal of the
-country's bounding box. Measuring from the edge of the perfect radius rather than
-from the target means the score eases out of 100 instead of stepping off it — at
-Germany's size, 20 km is 98 and 30 km is 94. Scoring relative to the country's
-own size is what keeps Luxembourg and Russia comparably hard: being 50 km off
-matters a lot more in one than the other. A quarter of the country away is about
-37, half the country away about 14.
+yardstick)`, clamped to 1–100. Measuring from the edge of the perfect radius
+rather than from the target means the score eases out of 100 instead of stepping
+off it — on a 800 km yardstick, 20 km is 98 and 30 km is 94.
+
+### The yardstick
+
+Two things it is deliberately not. Scoring purely on absolute distance would make
+small countries trivial and huge ones hopeless: 100 km off is a rounding error in
+Russia and the whole country in Lebanon. Scoring purely against a country's own
+size — the original approach here — makes the same miss mean wildly different
+things, and breaks outright on the countries whose bounding box is set by a
+territory thousands of km away. France's box reaches the Kerguelen Islands, which
+scored a **1,000 km miss in Paris as 78 out of 100**.
+
+So the yardstick is built in two steps:
+
+1. **From the places, not the box.** Take the median centre of the country's
+   locations, the distance covering 85% of them, and double it. Medians and a
+   percentile rather than extremes, so Kerguelen, Svalbard, the Azores and Hawaii
+   cannot stretch a country. Longitudes are averaged on the circle, or a country
+   straddling the antimeridian would land its centre on the far side of the
+   planet.
+2. **Halfway back to a general scale.** The result is the geometric mean of that
+   spread and a fixed 1,000 km, which halves how much the country matters without
+   flattening it away. Across the 127 countries this pulls the yardsticks from a
+   109× spread (153 km–16,649 km) down to 7× (338 km–2,522 km).
+
+What changes in practice:
+
+| | 50 km miss | 300 km miss |
+| --- | --- | --- |
+| Israel | 32 → **69** | 1 → 5 |
+| Germany | 81 → **84** | 29 → 25 |
+| France | 99 → **87** | 93 → **33** |
+| United States | 98 → **94** | 87 → **58** |
+| Russia | 95 → 95 | 72 → 64 |
+
+Small countries get more forgiving, the broken ones get honest, and a miss of a
+given size now means something closer to the same thing everywhere.
 
 ## Map
 
@@ -82,6 +114,12 @@ data/index.json            # country list: code, name, place count, bounding box
 data/countries/DE.json     # { code, name, bbox, locations: [{ name, lat, lon, pop }] }
 data/borders/*.json        # MultiLineString overlays for the Borders button
 ```
+
+Each country carries two boxes: `bbox` is its true extent, and `view` is what the
+map frames a round on. They differ for the same reason the yardstick needed
+fixing — framing France's real extent opens the round on half a hemisphere with
+the country a speck in the corner, so `view` drops the outlying 15% of places.
+Everything is still reachable by panning; it is a starting view, not a boundary.
 
 Locations are sorted by population descending (that ordering *is* the difficulty
 mechanic — the app never re-sorts, it slices) and capped at 700 per country so no

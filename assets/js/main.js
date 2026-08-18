@@ -40,7 +40,7 @@ const ui = {
 
 const state = {
   countries: [],
-  selected: null,      // index entry {code,name,count,bbox}
+  selected: null,      // index entry {code,name,count,bbox,view}
   difficulty: 'easy',
   rounds: 0,           // how many of the pool to play; the full pool by default
   poolKey: null,       // country+difficulty the round slider was last sized for
@@ -86,6 +86,13 @@ function renderCountryList(filter = '') {
   }
 }
 
+/**
+ * What the map opens on. `view` trims the outlying places so France does not
+ * start framed on the Indian Ocean; older datasets without one fall back to the
+ * full extent.
+ */
+const framing = (country) => country.view ?? country.bbox;
+
 /** The country's best average across every difficulty and round count. */
 function topBest(code) {
   return bestsForCountry(code).reduce((a, b) => (!a || b.avg > a.avg ? b : a), null);
@@ -118,7 +125,7 @@ function selectCountry(country) {
   for (const li of ui.countryList.children) {
     li.ariaSelected = String(li.dataset.code === country.code);
   }
-  view.frameCountry(country.bbox);
+  view.frameCountry(framing(country));
   refreshMenu();
 }
 
@@ -210,7 +217,7 @@ async function startGame() {
     // Pinned at kick-off: the menu can be re-set before the summary is filed.
     difficulty: state.difficulty,
     custom,
-    scaleKm: countryScaleKm(country.bbox),
+    scaleKm: countryScaleKm(country.locations),
     targets,
     index: 0,
     guess: null,
@@ -233,7 +240,7 @@ function beginRound() {
   game.guess = null;
   game.phase = 'guessing';
   view.clearRound();
-  view.frameCountry(game.country.bbox);
+  view.frameCountry(framing(game.country));
   view.setPicking(true);
 
   el('hud-country').textContent = game.country.name;
@@ -351,7 +358,7 @@ function quitToMenu() {
   ui.result.hidden = true;
   ui.summary.hidden = true;
   ui.menu.hidden = false;
-  if (state.selected) view.frameCountry(state.selected.bbox);
+  if (state.selected) view.frameCountry(framing(state.selected));
   else view.resetView();
   refreshMenu();
 }

@@ -3,14 +3,14 @@
 const INDEX_URL = 'data/index.json';
 const countryCache = new Map();
 
-/** @returns {Promise<{sourceLabel:string, countries:Array<{code:string,name:string,count:number,bbox:number[]}>}>} */
+/** @returns {Promise<{sourceLabel:string, countries:Array<{code:string,name:string,count:number,bbox:number[],view:number[]}>}>} */
 export async function loadIndex() {
   const res = await fetch(INDEX_URL);
   if (!res.ok) throw new Error(`Could not load ${INDEX_URL} (${res.status})`);
   return res.json();
 }
 
-/** @returns {Promise<{code:string,name:string,bbox:number[],locations:Array<{name:string,lat:number,lon:number,pop:number}>}>} */
+/** @returns {Promise<{code:string,name:string,bbox:number[],view:number[],locations:Array<{name:string,lat:number,lon:number,pop:number}>}>} */
 export async function loadCountry(code) {
   if (!countryCache.has(code)) {
     countryCache.set(

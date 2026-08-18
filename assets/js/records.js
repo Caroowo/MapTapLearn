@@ -11,11 +11,11 @@
  * playing with bests held in memory for the session.
  */
 
-// v3: difficulty became the whole setup — a game plays its entire pool, so the
-// round count is no longer part of what identifies a run, and earlier bests were
-// scored on a different set of places.
-const KEY = 'maptap-learn.records.v3';
-const VERSION = 3;
+// v4: the scoring yardstick changed, so old bests were scored on a different
+// curve — in France or Norway a wildly more forgiving one — and are not targets
+// anyone can chase on equal terms.
+const KEY = 'maptap-learn.records.v4';
+const VERSION = 4;
 
 /** Parsed records, loaded once. Also the whole store when localStorage is out. */
 let cache = null;
