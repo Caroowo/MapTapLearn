@@ -1,0 +1,15 @@
+{
+  "name": "maptap-learn",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MapTap Learn - map learning game",
+  "type": "module",
+  "scripts": {
+    "build:data": "node scripts/build-dataset.mjs",
+    "scrape": "node scripts/scrape-maptap.mjs",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "all-the-cities": "^3.1.0"
+  }
+}
