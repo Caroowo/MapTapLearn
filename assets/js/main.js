@@ -34,7 +34,6 @@ const ui = {
   menuSummary: el('menu-summary'),
   menuBest: el('menu-best'),
   start: el('btn-start'),
-  confirm: el('btn-confirm'),
   next: el('btn-next'),
   hint: el('action-hint'),
 };
@@ -244,23 +243,16 @@ function beginRound() {
 
   ui.result.hidden = true;
   ui.actionbar.hidden = false;
-  ui.hint.textContent = 'Click the map to place your pin';
-  ui.confirm.disabled = true;
-  ui.confirm.textContent = 'Confirm guess';
+  ui.hint.textContent = 'Click the map to drop your pin';
 }
 
+/** One click is the whole guess: placing the pin scores it. */
 function placeGuess(latlon) {
   const game = state.game;
   if (!game || game.phase !== 'guessing') return;
+
   game.guess = latlon;
   view.showGuess(latlon);
-  ui.confirm.disabled = false;
-  ui.hint.textContent = 'Drag or click again to adjust';
-}
-
-function confirmGuess() {
-  const game = state.game;
-  if (!game || game.phase !== 'guessing' || !game.guess) return;
 
   const target = game.targets[game.index];
   const dist = distanceKm(game.guess, target);
@@ -370,7 +362,6 @@ function wireEvents() {
   view.onPick = placeGuess;
   ui.search.addEventListener('input', () => renderCountryList(ui.search.value));
   ui.start.addEventListener('click', startGame);
-  ui.confirm.addEventListener('click', confirmGuess);
   ui.next.addEventListener('click', nextRound);
   el('btn-quit').addEventListener('click', quitToMenu);
   el('btn-again').addEventListener('click', startGame);
@@ -382,14 +373,14 @@ function wireEvents() {
     refreshMenu();
   });
 
-  // Enter/Space advances the round without hunting for the button.
+  // Enter/Space advances the round without hunting for the button. There is
+  // nothing to confirm any more, so it only moves on from a revealed round.
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     if (event.target instanceof HTMLInputElement) return;
-    if (!state.game) return;
+    if (state.game?.phase !== 'revealed') return;
     event.preventDefault();
-    if (state.game.phase === 'guessing') confirmGuess();
-    else nextRound();
+    nextRound();
   });
 }
 

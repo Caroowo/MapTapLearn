@@ -31,12 +31,25 @@ export function countryScaleKm(bbox) {
 }
 
 /**
+ * How close counts as dead on. Landing within this of a place means you knew
+ * where it was, and which pixel inside the city you happened to hit should not
+ * be what decides the round.
+ *
+ * Flat rather than scaled to the country: the smallest country in the dataset is
+ * ~153 km across, so this is at most a tenth of any yardstick.
+ */
+export const PERFECT_KM = 15;
+
+/**
  * Score a guess on a 1-100 scale.
- * Exponential falloff against the country's own size: dead on = 100,
+ * Within PERFECT_KM it is 100. Past that the curve is the same exponential
+ * falloff against the country's own size, just measured from the edge of the
+ * perfect radius, so the score eases out of 100 instead of stepping off it:
  * a quarter of the country away ≈ 37, half the country away ≈ 14.
  */
 export function scoreGuess(distKm, scaleKm) {
-  const raw = 100 * Math.exp((-4 * distKm) / scaleKm);
+  const beyond = Math.max(0, distKm - PERFECT_KM);
+  const raw = 100 * Math.exp((-4 * beyond) / scaleKm);
   return Math.max(1, Math.min(100, Math.round(raw)));
 }
 

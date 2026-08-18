@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "build:data": "node scripts/build-dataset.mjs",
+    "build:borders": "node scripts/build-borders.mjs",
     "scrape": "node scripts/scrape-maptap.mjs",
     "serve": "python3 -m http.server 8080"
   },
