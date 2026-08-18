@@ -1,5 +1,9 @@
 # MapTap Learn
 
+> **Vibe coded with [Claude Code](https://claude.ai/code).** Every line here — the
+> game, the scrapers, the datasets, the scoring maths and this README — was
+> written by an AI agent from conversational prompts.
+
 A map learning game for [maptap.gg](https://maptap.gg). Pick a country, get shown
 one of its places, drop a pin on a satellite world map, and get scored 1–100 on
 how close you were — with both pins revealed side by side.
