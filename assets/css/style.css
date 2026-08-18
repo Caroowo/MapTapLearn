@@ -282,6 +282,13 @@ html, body {
 .country-list li:hover { background: rgba(255, 255, 255, 0.07); }
 .country-list li[aria-selected="true"] { background: rgba(76, 194, 255, 0.2); }
 .country-list .count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.country-list .best {
+  margin-left: auto;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 .country-list .empty { justify-content: center; color: var(--muted); cursor: default; }
 .country-list .empty:hover { background: none; }
 
@@ -293,16 +300,30 @@ html, body {
   background: transparent;
   color: var(--text);
   font: inherit;
-  padding: 9px 4px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 4px;
   border-radius: 10px;
   cursor: pointer;
   text-align: center;
 }
-.seg strong { display: block; font-size: 13px; }
-.seg small { display: block; color: var(--muted); font-size: 11px; margin-top: 1px; }
 .seg.is-active { background: rgba(76, 194, 255, 0.16); border-color: var(--accent); }
 
-.menu-summary { min-height: 18px; margin: 0 0 12px; font-size: 13px; color: var(--muted); }
+.rounds-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.rounds-label output { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
+.slider {
+  width: 100%;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+.slider:disabled { cursor: default; opacity: 0.45; }
+
+.menu-summary { min-height: 18px; margin: 0 0 4px; font-size: 13px; color: var(--muted); }
+.menu-best { min-height: 16px; margin: 0 0 12px; font-size: 12px; color: var(--warn); }
+/* A practice run is a choice, not an achievement — it should not read as one. */
+.menu-best.is-practice { color: var(--muted); }
 .credit { margin: 12px 0 0; text-align: center; font-size: 11px; color: #67748a; }
 
 /* ---------- summary ---------- */
@@ -310,6 +331,8 @@ html, body {
 .summary-title { margin: 0 0 10px; font-size: 20px; }
 .summary-total { display: flex; align-items: baseline; gap: 8px; }
 .summary-avg { font-size: 44px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.summary-best { margin: 6px 0 0; font-size: 13px; color: var(--muted); }
+.summary-best.is-record { color: var(--warn); font-weight: 700; }
 .summary-list {
   list-style: none;
   counter-reset: r;

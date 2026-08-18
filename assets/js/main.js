@@ -1,6 +1,13 @@
 /** MapTap Learn — menu, game loop and result reporting. */
 
-import { loadIndex, loadCountry, pool, poolSize, drawRounds } from './data.js';
+import {
+  loadIndex,
+  loadCountry,
+  pool,
+  poolSize,
+  roundOrder,
+  availableDifficulties,
+} from './data.js';
 import {
   distanceKm,
   countryScaleKm,
@@ -10,6 +17,7 @@ import {
   formatDistance,
 } from './scoring.js';
 import { MapView } from './mapview.js';
+import { bestFor, bestsForCountry, saveResult, isPersistent } from './records.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -21,7 +29,10 @@ const ui = {
   result: el('result'),
   search: el('country-search'),
   countryList: el('country-list'),
+  rounds: el('round-count'),
+  roundsValue: el('round-count-value'),
   menuSummary: el('menu-summary'),
+  menuBest: el('menu-best'),
   start: el('btn-start'),
   confirm: el('btn-confirm'),
   next: el('btn-next'),
@@ -32,9 +43,13 @@ const state = {
   countries: [],
   selected: null,      // index entry {code,name,count,bbox}
   difficulty: 'easy',
-  rounds: 5,
+  rounds: 0,           // how many of the pool to play; the full pool by default
+  poolKey: null,       // country+difficulty the round slider was last sized for
   game: null,
 };
+
+/** A short run is practice: it plays a random slice, so it sets no records. */
+const isCustomRun = () => state.rounds < poolSize(state.difficulty, state.selected.count);
 
 const view = new MapView('map');
 
@@ -62,9 +77,40 @@ function renderCountryList(filter = '') {
     li.role = 'option';
     li.dataset.code = country.code;
     li.ariaSelected = String(state.selected?.code === country.code);
-    li.innerHTML = `<span>${country.name}</span><span class="count">${country.count}</span>`;
+    const best = topBest(country.code);
+    li.innerHTML =
+      `<span>${country.name}</span>` +
+      (best ? `<span class="best" title="Your best average here">★ ${best.avg}</span>` : '') +
+      `<span class="count">${country.count}</span>`;
     li.addEventListener('click', () => selectCountry(country));
     ui.countryList.append(li);
+  }
+}
+
+/** The country's best average across every difficulty and round count. */
+function topBest(code) {
+  return bestsForCountry(code).reduce((a, b) => (!a || b.avg > a.avg ? b : a), null);
+}
+
+function currentSetup(country = state.selected) {
+  return { code: country.code, difficulty: state.difficulty };
+}
+
+/**
+ * Shows only the difficulties this country is big enough for, and moves the
+ * selection off one that just disappeared — onto the easiest still standing,
+ * since that is what the vanished button was.
+ */
+function refreshDifficulties(country) {
+  const available = availableDifficulties(country.count);
+  if (!available.includes(state.difficulty)) state.difficulty = available[0];
+
+  for (const button of document.querySelectorAll('[data-difficulty]')) {
+    const key = button.dataset.difficulty;
+    const on = key === state.difficulty;
+    button.hidden = !available.includes(key);
+    button.classList.toggle('is-active', on);
+    button.ariaChecked = String(on);
   }
 }
 
@@ -79,34 +125,62 @@ function selectCountry(country) {
 
 function refreshMenu() {
   const country = state.selected;
-  const total = country?.count ?? 0;
-
-  el('pool-easy').textContent = country ? `${poolSize('easy', total)} places` : 'top 10';
-  el('pool-medium').textContent = country ? `${poolSize('medium', total)} places` : 'top half';
-  el('pool-hard').textContent = country ? `${total} places` : 'everything';
 
   if (!country) {
     ui.menuSummary.textContent = '';
+    ui.menuBest.textContent = '';
     ui.start.disabled = true;
     ui.start.textContent = 'Pick a country';
     return;
   }
 
-  const size = poolSize(state.difficulty, total);
-  const rounds = Math.min(state.rounds, size);
-  ui.menuSummary.textContent = `${country.name} · ${rounds} rounds drawn from its ${size} biggest places.`;
+  refreshDifficulties(country);
+  const size = poolSize(state.difficulty, country.count);
+  refreshRoundSlider(country, size);
+
+  const pick = size === country.count
+    ? `all ${size} places`
+    : `its ${size} biggest places`;
+  ui.menuSummary.textContent = isCustomRun()
+    ? `${country.name} · ${state.rounds} places drawn from ${pick}.`
+    : `${country.name} · ${pick}, in a random order.`;
+
+  const best = bestFor(currentSetup(country));
+  const practice = isCustomRun();
+  ui.menuBest.classList.toggle('is-practice', practice);
+  if (practice) {
+    ui.menuBest.textContent = 'Practice run — a short game sets no record';
+  } else {
+    ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
+  }
   ui.start.disabled = false;
   ui.start.textContent = `Play ${country.name}`;
 }
 
-function wireSegmented(selector, key, cast = String) {
-  for (const button of document.querySelectorAll(selector)) {
+/**
+ * Sizes the round slider to the pool. Picking a new country or difficulty snaps
+ * it back to the full pool — the shortened run belongs to the setup you chose it
+ * for, and silently carrying "12 rounds" into a 5-place pool would be nonsense.
+ */
+function refreshRoundSlider(country, size) {
+  const poolKey = `${country.code}:${state.difficulty}`;
+  if (poolKey !== state.poolKey) {
+    state.poolKey = poolKey;
+    state.rounds = size;
+    ui.rounds.max = String(size);
+    ui.rounds.value = String(size);
+  }
+  // A pool of one has nothing to slide.
+  ui.rounds.disabled = size < 2;
+  ui.roundsValue.textContent = isCustomRun()
+    ? `${state.rounds} of ${size}`
+    : `all ${size}`;
+}
+
+function wireDifficulties() {
+  for (const button of document.querySelectorAll('[data-difficulty]')) {
     button.addEventListener('click', () => {
-      for (const sibling of button.parentElement.children) {
-        sibling.classList.toggle('is-active', sibling === button);
-        sibling.ariaChecked = String(sibling === button);
-      }
-      state[key] = cast(button.dataset[key]);
+      state.difficulty = button.dataset.difficulty;
       refreshMenu();
     });
   }
@@ -128,9 +202,15 @@ async function startGame() {
     return;
   }
 
-  const targets = drawRounds(pool(country, state.difficulty), state.rounds);
+  // Shuffle first, then cut: a short run is a random slice of the pool, not its
+  // biggest few — those are what the easier difficulty already plays.
+  const custom = isCustomRun();
+  const targets = roundOrder(pool(country, state.difficulty)).slice(0, state.rounds);
   state.game = {
     country,
+    // Pinned at kick-off: the menu can be re-set before the summary is filed.
+    difficulty: state.difficulty,
+    custom,
     scaleKm: countryScaleKm(country.bbox),
     targets,
     index: 0,
@@ -226,10 +306,35 @@ function finishGame() {
   ui.actionbar.hidden = true;
   ui.result.hidden = true;
 
-  el('summary-title').textContent = `${game.country.name} · ${game.results.length} rounds`;
+  // A practice run played a random slice, so there is nothing to compare it to.
+  const filed = game.custom
+    ? null
+    : saveResult(
+        { code: game.country.code, difficulty: game.difficulty },
+        { avg, total: game.total, places: game.results.length },
+      );
+
+  el('summary-title').textContent =
+    `${game.country.name} · ${game.difficulty} · ${game.results.length} places`;
   el('summary-avg').textContent = String(avg);
   el('summary-line').textContent =
     `${game.total} points total · best round: ${best.name} (${best.points})`;
+
+  const bestLine = el('summary-best');
+  bestLine.classList.toggle('is-record', Boolean(filed?.isRecord));
+  if (!filed) {
+    const standing = bestFor({ code: game.country.code, difficulty: game.difficulty });
+    bestLine.textContent = standing
+      ? `Practice run — not scored. Your best at this setup: ${standing.avg} avg`
+      : 'Practice run — not scored. Play the full pool to set a best.';
+  } else if (filed.isRecord && filed.previous) {
+    bestLine.textContent = `★ New best — you beat ${filed.previous.avg} avg`;
+  } else if (filed.isRecord) {
+    bestLine.textContent = '★ New best — first run at this setup';
+  } else {
+    bestLine.textContent = `Your best at this setup: ${filed.best.avg} avg`;
+  }
+  if (filed && !isPersistent()) bestLine.textContent += ' (this browser is not saving scores)';
 
   const list = el('summary-list');
   list.innerHTML = '';
@@ -242,6 +347,7 @@ function finishGame() {
     list.append(li);
   }
   ui.summary.hidden = false;
+  if (filed?.isRecord) renderCountryList(ui.search.value);
 }
 
 function quitToMenu() {
@@ -270,8 +376,11 @@ function wireEvents() {
   el('btn-again').addEventListener('click', startGame);
   el('btn-menu').addEventListener('click', quitToMenu);
 
-  wireSegmented('[data-difficulty]', 'difficulty');
-  wireSegmented('[data-rounds]', 'rounds', Number);
+  wireDifficulties();
+  ui.rounds.addEventListener('input', () => {
+    state.rounds = Number(ui.rounds.value);
+    refreshMenu();
+  });
 
   // Enter/Space advances the round without hunting for the button.
   document.addEventListener('keydown', (event) => {

@@ -10,17 +10,32 @@ static host, including GitHub Pages.
 ## Play
 
 1. **Pick a country** — search the list; the number is how many places it has.
-2. **Pick a difficulty** — this decides the pool of places you can be asked about:
-   | Difficulty | Pool |
-   | --- | --- |
-   | Easy | the 10 most populous places |
-   | Medium | the most populous half |
-   | Hard | every place in the country |
+2. **Pick a difficulty** — that is the whole setup. A game asks about every
+   place in the pool, in a random order:
+   | Difficulty | Pool | Germany (97 places) |
+   | --- | --- | --- |
+   | Easy | the 5 most populous places | 5 rounds |
+   | Medium | the most populous half | 49 rounds |
+   | Hard | every place in the country | 97 rounds |
    Places are ordered by population, so easy asks about the ones you are most
-   likely to know and hard reaches into small towns.
-3. **Pick a round count** (5 / 10 / 20) and play. Click the map to place your
-   pin, click again to adjust, then confirm. `Enter` or `Space` also confirms
-   and advances.
+   likely to know and hard reaches into small towns. The pool is fixed and only
+   its order is shuffled, so two runs of a setup are comparable and a personal
+   best is a target you can actually chase.
+
+   A country too small for the ladder drops a tier rather than offering two
+   buttons that play alike: with 10 places the top half is also 5 places, so
+   **Easy** disappears and Medium is the easiest game. 39 of the 127 countries
+   are in that position.
+3. **Optionally shorten it.** The slider under the difficulty runs from 1 to the
+   pool size and starts at the full pool. Pull it down for a quick run — 25 of
+   Germany's 97, say — and the game plays a random slice of the pool instead of
+   all of it. Picking a different country or difficulty snaps it back to full.
+
+   A shortened run is **practice and is not scored**: it plays a random slice, so
+   two of them are not the same game and neither is comparable to the full pool.
+   Personal bests only come from playing a whole pool.
+4. **Play.** Click the map to place your pin, click again to adjust, then
+   confirm. `Enter` or `Space` also confirms and advances.
 
 ### Scoring
 
@@ -48,7 +63,8 @@ data/countries/DE.json     # { code, name, bbox, locations: [{ name, lat, lon, p
 ```
 
 Locations are sorted by population descending (that ordering *is* the difficulty
-mechanic) and capped at 700 per country so no round pulls a large file. The cap
+mechanic — the app never re-sorts, it slices) and capped at 700 per country so no
+round pulls a large file. The cap
 is a guard rail rather than curation — places with no population sort last, so a
 cap tighter than the biggest country deletes landmarks (at 300 the US lost
 Alcatraz, China the Forbidden City and Everest) rather than trimming filler.
@@ -91,6 +107,32 @@ npm run build:data     # regenerate from GeoNames instead
 Both scripts write the identical on-disk shape, so swapping sources needs no app
 changes; the menu footer shows which source is loaded.
 
+## Scores
+
+Finishing a game files a personal best in `localStorage`, under
+`maptap-learn.records.v3`. Nothing leaves the browser and there is no account.
+
+Only a full run of a pool is scored; the round slider is practice (see **Play**
+above). A best belongs to a *setup* — country and difficulty — because that is
+what makes two scores comparable: a setup always asks about the same places, so
+beating your best means beating it on the same questions. A tie does not
+overwrite a standing best.
+
+The key carries a version for that reason: when what a setup plays changes, the
+bests scored against the old one are not records anyone can chase, so the version
+moves and they start over rather than standing as targets set on a different
+game.
+
+Bests show up in three places: a ★ badge in the country list (that country's best
+across every setup), a line under the menu summary (the best for the exact setup
+selected), and the end-of-game panel, which says whether the run beat it.
+
+Storage is best-effort. Reading or writing `localStorage` throws outright in some
+browsers — private mode, cookies disabled, a `file://` page under a strict policy
+— so every access is guarded and a failure degrades to bests held in memory for
+the session; the summary says so rather than the game breaking. `clearRecords()`
+in `assets/js/records.js` wipes them.
+
 ## Run locally
 
 ```bash
@@ -118,6 +160,7 @@ fit the existing round loop — they only need a different pool builder in
 ```
 index.html              markup for menu, HUD, result and summary
 assets/js/main.js       menu, game loop, result reporting
+assets/js/records.js    personal bests in localStorage
 assets/js/data.js       dataset loading, difficulty pools, round draw
 assets/js/scoring.js    great-circle distance, 1–100 score
 assets/js/mapview.js    Leaflet wrapper: basemap, pins, reveal

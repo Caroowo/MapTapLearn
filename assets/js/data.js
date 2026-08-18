@@ -27,21 +27,41 @@ export async function loadCountry(code) {
   return countryCache.get(code);
 }
 
+/**
+ * Difficulty is the whole setup: it decides how many of a country's places a
+ * game asks about, and the game asks about all of them. Locations are stored
+ * sorted by population descending, so a pool is always "the N best-known
+ * places" rather than a sample.
+ */
 export const DIFFICULTIES = {
-  easy: { label: 'Easy', describe: (n) => `top ${Math.min(10, n)} by population` },
-  medium: { label: 'Medium', describe: (n) => `top ${poolSize('medium', n)} by population` },
-  hard: { label: 'Hard', describe: (n) => `all ${n}` },
+  easy: { label: 'Easy', size: (total) => Math.min(5, total) },
+  medium: { label: 'Medium', size: (total) => Math.ceil(total / 2) },
+  hard: { label: 'Hard', size: (total) => total },
 };
 
-/**
- * How many of a country's locations a difficulty unlocks.
- * Locations are stored sorted by population descending, so a pool is always
- * "the N best-known places" rather than a random sample.
- */
 export function poolSize(difficulty, total) {
-  if (difficulty === 'easy') return Math.min(10, total);
-  if (difficulty === 'medium') return Math.max(Math.min(10, total), Math.ceil(total / 2));
-  return total;
+  return DIFFICULTIES[difficulty].size(total);
+}
+
+/**
+ * The difficulties worth offering for a country, easiest first.
+ *
+ * Small countries collapse the ladder: with 10 places the top half is also five
+ * places, so medium and easy are the same game, and with 6 the top half is
+ * *smaller* than easy. Walking from hard down and keeping a tier only when it is
+ * strictly smaller than the one above drops the redundant easier tier rather
+ * than offering two buttons that play alike.
+ */
+export function availableDifficulties(total) {
+  const kept = [];
+  let smallest = Infinity;
+  for (const difficulty of ['hard', 'medium', 'easy']) {
+    const size = poolSize(difficulty, total);
+    if (size >= smallest || size < 1) continue;
+    kept.unshift(difficulty);
+    smallest = size;
+  }
+  return kept;
 }
 
 /** The playable slice of a country for a difficulty. */
@@ -49,12 +69,22 @@ export function pool(country, difficulty) {
   return country.locations.slice(0, poolSize(difficulty, country.locations.length));
 }
 
-/** Picks `count` distinct locations from the pool, biased toward nothing — pure random. */
-export function drawRounds(locations, count) {
-  const bag = [...locations];
+function shuffle(items) {
+  const bag = [...items];
   for (let i = bag.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [bag[i], bag[j]] = [bag[j], bag[i]];
   }
-  return bag.slice(0, Math.min(count, bag.length));
+  return bag;
+}
+
+/**
+ * The rounds of a game: every place in the pool, in a random order.
+ *
+ * Which places you get is fixed by the difficulty, so two runs are comparable
+ * and a personal best is a target you can chase; only the order changes, so a
+ * country doesn't turn into a memorized sequence.
+ */
+export function roundOrder(locations) {
+  return shuffle(locations);
 }
