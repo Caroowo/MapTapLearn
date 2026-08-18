@@ -48,33 +48,47 @@ data/countries/DE.json     # { code, name, bbox, locations: [{ name, lat, lon, p
 ```
 
 Locations are sorted by population descending (that ordering *is* the difficulty
-mechanic) and capped at 300 per country so no round pulls a large file.
+mechanic) and capped at 700 per country so no round pulls a large file. The cap
+is a guard rail rather than curation — places with no population sort last, so a
+cap tighter than the biggest country deletes landmarks (at 300 the US lost
+Alcatraz, China the Forbidden City and Everest) rather than trimming filler.
 
 ### Sources
 
-**Currently shipped:** a bootstrap dataset built from GeoNames — 211 countries,
-~24,800 places — because `maptap.gg` was unreachable from the environment this
-was built in (the network egress proxy refused the connection).
+**Currently shipped:** MapTap's own atlas — 126 countries, 4,630 places, scraped
+from `maptap.gg`. The site's `/locations` page is a shell that loads its pool from
+`data/master_locations_v2.js` (a plain `const masterLocationsV2 = [...]`, 7,920
+entries of which 5,443 are active); the scraper reads that.
 
 ```bash
 npm install
-npm run build:data     # regenerate from GeoNames
-```
-
-**To switch to MapTap's own locations**, from a machine that can reach the site:
-
-```bash
 npm run scrape                       # scrape maptap.gg/locations → data/
 npm run scrape -- --dump             # inspect what it finds first, write nothing
-npm run scrape -- --url <endpoint>   # point it at a specific JSON endpoint
+npm run scrape -- --url <endpoint>   # point it at a specific page or endpoint
 ```
 
-`scripts/scrape-maptap.mjs` tries known JSON endpoints, then JSON embedded in
-the page (Next.js/Nuxt/JSON-LD or any inline array of location-shaped objects),
-then an HTML table, and normalizes by sniffing field names (`lat`/`latitude`/`y`,
-`pop`/`population`, …). If nothing matches it saves the raw responses to
-`data/raw/` and says so — extend the `KEYS` map in that script to fit. Both
-scripts write the identical on-disk shape, so swapping sources needs no app
+`scripts/scrape-maptap.mjs` tries known JSON endpoints, then JSON embedded in the
+page (Next.js/Nuxt/JSON-LD or any inline array of location-shaped objects), then
+an HTML table, and finally the `<script src>` assets whose URL hints they carry
+locations — so if MapTap renames or re-versions the data file, the page still
+leads the scraper to it. Records are normalized by sniffing field names
+(`lat`/`latitude`/`y`, `lng`/`lon`, `pop`/`population`, …); entries MapTap flags
+`disabled` are skipped, country names are folded onto ISO codes (`England` → `GB`,
+`Côte d'Ivoire` → `CI`), border-straddling entries like `Nepal/China` are dropped
+since a round has exactly one right country, and the country is trimmed off labels
+(`Akron, Ohio, USA` → `Akron, Ohio`) so the prompt doesn't give the answer away.
+If nothing matches it saves the raw responses to `data/raw/` and says so — extend
+the `KEYS` map in that script to fit.
+
+**The GeoNames bootstrap** is still available and covers more countries (211,
+~24,800 places), since MapTap's pool thins out below the 6-locations-per-country
+floor for about 100 small states and territories:
+
+```bash
+npm run build:data     # regenerate from GeoNames instead
+```
+
+Both scripts write the identical on-disk shape, so swapping sources needs no app
 changes; the menu footer shows which source is loaded.
 
 ## Run locally

@@ -7,7 +7,9 @@
  *
  * The page's exact markup is not pinned down here, so the scraper tries, in
  * order: known JSON endpoints, JSON embedded in the HTML (Next.js/Nuxt/JSON-LD
- * or any inline array of location-shaped objects), and finally an HTML table.
+ * or any inline array of location-shaped objects), an HTML table, and finally
+ * the location-shaped JS assets the page pulls in (maptap.gg keeps its atlas in
+ * data/master_locations_v2.js, a plain `const masterLocationsV2 = [...]`).
  * Whatever it finds is normalized by field-name sniffing, so renamed keys
  * (`latitude`/`lat`/`y`, `pop`/`population`/`inhabitants`, …) still land.
  * If every strategy misses it dumps the raw response to data/raw/ and says so.
@@ -31,6 +33,7 @@ const API_CANDIDATES = [
   `${ORIGIN}/locations.json`,
   `${ORIGIN}/api/v1/locations`,
   `${ORIGIN}/data/locations.json`,
+  `${ORIGIN}/data/master_locations_v2.js`,
 ];
 
 const HEADERS = {
@@ -64,25 +67,70 @@ function pick(obj, names) {
 }
 
 const COUNTRY_CODES = new Intl.DisplayNames(['en'], { type: 'region' });
+
+/** Folds spelling variants together: "St. Kitts & Nevis" === "Saint Kitts and Nevis". */
+function foldCountryName(value) {
+  return value
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/\bst\.?\b/g, 'saint')
+    .replace(/\bthe\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Names Intl spells differently enough that folding cannot bridge the gap, plus
+ * the UK's constituent countries, which maptap.gg lists in place of "United Kingdom".
+ */
+const COUNTRY_ALIASES = new Map(Object.entries({
+  england: 'GB', scotland: 'GB', wales: 'GB', 'northern ireland': 'GB',
+  'great britain': 'GB', uk: 'GB', usa: 'US', 'united states of america': 'US',
+  'democratic republic of congo': 'CD', 'dr congo': 'CD', 'republic of congo': 'CG',
+  myanmar: 'MM', burma: 'MM', palestine: 'PS', 'east timor': 'TL',
+  'georgia country': 'GE', 'federated states of micronesia': 'FM',
+  'turks and caicos': 'TC', 'south georgia': 'GS', 'midway atoll': 'UM',
+  saba: 'BQ', 'sint eustatius': 'BQ', bonaire: 'BQ', 'ivory coast': 'CI',
+  'cape verde': 'CV', swaziland: 'SZ', macedonia: 'MK', vatican: 'VA',
+}));
+
 const nameToCode = (() => {
   const map = new Map();
   for (let a = 65; a <= 90; a++) {
     for (let b = 65; b <= 90; b++) {
       const code = String.fromCharCode(a, b);
       try {
+        // Deprecated codes resolve to their successor's name (SU → "Russia",
+        // FX → "France"); keep only codes that are their own canonical form.
+        if (new Intl.Locale(`und-${code}`).region !== code) continue;
         const name = COUNTRY_CODES.of(code);
-        if (name && name !== code) map.set(name.toLowerCase(), code);
+        if (name && name !== code) map.set(foldCountryName(name), code);
       } catch { /* not a region code */ }
     }
   }
+  for (const [alias, code] of COUNTRY_ALIASES) map.set(foldCountryName(alias), code);
   return map;
 })();
 
-function toCountryCode(value) {
-  if (typeof value !== 'string' || !value) return null;
-  const trimmed = value.trim();
-  if (/^[A-Za-z]{2}$/.test(trimmed)) return trimmed.toUpperCase();
-  return nameToCode.get(trimmed.toLowerCase()) ?? null;
+/**
+ * Border-straddling entries ("Nepal/China", "Argentina/Chile") name more than
+ * one country, and Everest really is in both — such a place is emitted once per
+ * country so it can come up in either one's rounds.
+ * @returns {string[]} ISO codes, empty when nothing resolves.
+ */
+function toCountryCodes(value) {
+  if (typeof value !== 'string' || !value) return [];
+  const codes = new Set();
+  for (const part of value.split('/')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const code = /^[A-Za-z]{2}$/.test(trimmed)
+      ? trimmed.toUpperCase()
+      : nameToCode.get(foldCountryName(trimmed));
+    if (code) codes.add(code);
+  }
+  return [...codes];
 }
 
 function toNumber(value) {
@@ -92,10 +140,39 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : null;
 }
 
-/** @returns {{name,lat,lon,pop,country}|null} */
+/**
+ * maptap.gg labels places "Aarhus, Denmark" or "Akron, Ohio, USA" — the country
+ * is the answer here, so leaving it in the prompt gives the round away. Only
+ * country segments go; "Akron, Ohio" keeps the state that tells it apart from
+ * the other Akrons.
+ *
+ * The suffix is also a second source of countries: for eight places the label is
+ * the only place the border shows up ("Mount Everest, Nepal/China" carries
+ * country: "China"), so the countries it names come back with the trimmed label.
+ */
+function splitCountrySuffix(label, codes) {
+  const parts = label.split(',');
+  const named = new Set(codes);
+  while (parts.length > 1) {
+    const tail = toCountryCodes(parts[parts.length - 1].trim());
+    // Only a suffix naming this record's own country is a country suffix.
+    if (!tail.some((code) => codes.includes(code))) break;
+    for (const code of tail) named.add(code);
+    parts.pop();
+  }
+  return { name: parts.join(',').trim() || label, countries: [...named] };
+}
+
+/**
+ * @returns {Array<{name,lat,lon,pop,country}>} one record per country the place
+ * belongs to — usually one, more when it sits on a border.
+ */
 function normalize(raw) {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object') return [];
   const flat = { ...raw, ...(raw.properties ?? {}), ...(raw.attributes ?? {}) };
+
+  // maptap.gg ships retired entries in the same pool, flagged rather than removed.
+  if (flat.disabled === true || flat.enabled === false) return [];
 
   let lat = toNumber(pick(flat, KEYS.lat));
   let lon = toNumber(pick(flat, KEYS.lon));
@@ -105,32 +182,33 @@ function normalize(raw) {
     lon = toNumber(coords[0]);
     lat = toNumber(coords[1]);
   }
-  if (lat === null || lon === null) return null;
-  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  if (lat === null || lon === null) return [];
+  if (Math.abs(lat) > 90 || Math.abs(lon) > 180) return [];
 
   const name = pick(flat, KEYS.name);
-  if (typeof name !== 'string' || !name.trim()) return null;
+  if (typeof name !== 'string' || !name.trim()) return [];
 
-  const country = toCountryCode(pick(flat, KEYS.country));
-  if (!country) return null;
+  const countries = toCountryCodes(pick(flat, KEYS.country));
+  if (!countries.length) return [];
 
+  const suffix = splitCountrySuffix(name.trim(), countries);
   const pop = toNumber(pick(flat, KEYS.pop));
-  return {
-    name: name.trim(),
+  const place = {
+    name: suffix.name,
     lat: round(lat, 4),
     lon: round(lon, 4),
     // No population on a record means "least relevant", not "excluded".
     pop: pop && pop > 0 ? Math.round(pop) : 1,
-    country,
   };
+  return suffix.countries.map((country) => ({ ...place, country }));
 }
 
 /** Walks any JSON blob and collects everything that looks like a location. */
 function harvest(value, found = [], depth = 0) {
   if (depth > 12 || value === null || typeof value !== 'object') return found;
-  const hit = normalize(value);
-  if (hit) {
-    found.push(hit);
+  const hits = normalize(value);
+  if (hits.length) {
+    found.push(...hits);
     return found;
   }
   for (const child of Array.isArray(value) ? value : Object.values(value)) {
@@ -159,6 +237,53 @@ function jsonBlobsFromHtml(html) {
   return blobs;
 }
 
+/**
+ * Reads a literal out of a plain JS file (`const masterLocationsV2 = [{...}]`).
+ * Bracket-counting rather than a regex, so the `];` inside a string value or a
+ * nested array cannot cut the literal short.
+ */
+function jsonLiteralsFromJs(text) {
+  const found = [];
+  for (const match of text.matchAll(/(?:const|let|var)\s+[\w$]+\s*=\s*|(?:window|globalThis|module\.exports|exports\.[\w$]+)\s*=\s*/g)) {
+    const start = match.index + match[0].length;
+    const open = text[start];
+    if (open !== '[' && open !== '{') continue;
+    const close = open === '[' ? ']' : '}';
+
+    let depth = 0;
+    let quote = null;
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+      if (quote) {
+        if (ch === '\\') i++;
+        else if (ch === quote) quote = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === open) depth++;
+      else if (ch === close && --depth === 0) {
+        try {
+          found.push(JSON.parse(text.slice(start, i + 1)));
+        } catch { /* JS object literal, not JSON — skip */ }
+        break;
+      }
+    }
+  }
+  return found;
+}
+
+/** The `<script src>` assets whose URL hints they carry the location data. */
+function locationAssetUrls(html, baseUrl) {
+  const urls = new Set();
+  for (const [, src] of html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)) {
+    if (!/location|places|cities|atlas|master/i.test(src)) continue;
+    try {
+      urls.add(new URL(src, baseUrl).href);
+    } catch { /* unresolvable src */ }
+  }
+  return [...urls];
+}
+
 function locationsFromHtmlTable(html) {
   const rows = [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/gi)];
   if (rows.length < 2) return [];
@@ -174,12 +299,36 @@ function locationsFromHtmlTable(html) {
   for (const row of rows.slice(1)) {
     const values = cells(row[1]);
     if (values.length !== header.length) continue;
-    found.push(normalize(Object.fromEntries(header.map((h, i) => [h, values[i]]))));
+    found.push(...normalize(Object.fromEntries(header.map((h, i) => [h, values[i]]))));
   }
-  return found.filter(Boolean);
+  return found;
 }
 
 /* ------------------------------------------------- main */
+
+/** Runs every extraction strategy over one response body. */
+function extract(body, type = '') {
+  let found = [];
+  if (type.includes('json') || /^\s*[[{]/.test(body)) {
+    try {
+      found = harvest(JSON.parse(body));
+    } catch { /* fall through to the text-based strategies */ }
+  }
+  if (!found.length) {
+    for (const blob of jsonBlobsFromHtml(body)) {
+      found.push(...harvest(blob));
+      if (found.length) break;
+    }
+  }
+  if (!found.length) {
+    for (const literal of jsonLiteralsFromJs(body)) {
+      found.push(...harvest(literal));
+      if (found.length) break;
+    }
+  }
+  if (!found.length) found = locationsFromHtmlTable(body);
+  return found;
+}
 
 async function collect() {
   await mkdir(RAW_DIR, { recursive: true });
@@ -201,22 +350,30 @@ async function collect() {
     const file = path.join(RAW_DIR, `${url.replace(/[^a-z0-9]+/gi, '_').slice(-80)}.txt`);
     await writeFile(file, res.body);
 
-    let found = [];
-    if (res.type.includes('json') || /^\s*[[{]/.test(res.body)) {
-      try {
-        found = harvest(JSON.parse(res.body));
-      } catch { /* fall through to HTML handling */ }
-    }
-    if (!found.length) {
-      for (const blob of jsonBlobsFromHtml(res.body)) {
-        found.push(...harvest(blob));
-        if (found.length) break;
-      }
-    }
-    if (!found.length) found = locationsFromHtmlTable(res.body);
-
+    const found = extract(res.body, res.type);
     attempts.push(`${url} → HTTP ${res.status}, ${found.length} locations (raw saved to ${path.relative(ROOT, file)})`);
     if (found.length) return { url, found, attempts };
+
+    // Nothing inline: the page may just be a shell that loads its atlas as a
+    // separate script (maptap.gg does exactly this).
+    for (const assetUrl of locationAssetUrls(res.body, url)) {
+      let asset;
+      try {
+        asset = await get(assetUrl);
+      } catch (err) {
+        attempts.push(`  ↳ ${assetUrl} → network error: ${err.message}`);
+        continue;
+      }
+      if (!asset.ok) {
+        attempts.push(`  ↳ ${assetUrl} → HTTP ${asset.status}`);
+        continue;
+      }
+      const assetFile = path.join(RAW_DIR, `${assetUrl.replace(/[^a-z0-9]+/gi, '_').slice(-80)}.txt`);
+      await writeFile(assetFile, asset.body);
+      const hits = extract(asset.body, asset.type);
+      attempts.push(`  ↳ ${assetUrl} → HTTP ${asset.status}, ${hits.length} locations (raw saved to ${path.relative(ROOT, assetFile)})`);
+      if (hits.length) return { url: assetUrl, found: hits, attempts };
+    }
   }
   return { url: null, found: [], attempts };
 }

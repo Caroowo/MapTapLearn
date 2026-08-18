@@ -2,7 +2,10 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 
-export const MAX_PER_COUNTRY = 300;
+// A guard rail against one country pulling a huge file, not a curation step:
+// keep it above the largest country in either source, or the tail — which is
+// where the population-less landmarks sort — gets silently deleted.
+export const MAX_PER_COUNTRY = 700;
 export const MIN_PER_COUNTRY = 6;
 
 const displayName = new Intl.DisplayNames(['en'], { type: 'region' });
