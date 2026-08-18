@@ -309,8 +309,21 @@ html, body {
 }
 .seg.is-active { background: rgba(76, 194, 255, 0.16); border-color: var(--accent); }
 
+.rounds-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.rounds-label output { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; }
+.slider {
+  width: 100%;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+.slider:disabled { cursor: default; opacity: 0.45; }
+
 .menu-summary { min-height: 18px; margin: 0 0 4px; font-size: 13px; color: var(--muted); }
 .menu-best { min-height: 16px; margin: 0 0 12px; font-size: 12px; color: var(--warn); }
+/* A practice run is a choice, not an achievement — it should not read as one. */
+.menu-best.is-practice { color: var(--muted); }
 .credit { margin: 12px 0 0; text-align: center; font-size: 11px; color: #67748a; }
 
 /* ---------- summary ---------- */

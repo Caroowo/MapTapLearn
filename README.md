@@ -26,7 +26,15 @@ static host, including GitHub Pages.
    buttons that play alike: with 10 places the top half is also 5 places, so
    **Easy** disappears and Medium is the easiest game. 39 of the 127 countries
    are in that position.
-3. **Play.** Click the map to place your pin, click again to adjust, then
+3. **Optionally shorten it.** The slider under the difficulty runs from 1 to the
+   pool size and starts at the full pool. Pull it down for a quick run — 25 of
+   Germany's 97, say — and the game plays a random slice of the pool instead of
+   all of it. Picking a different country or difficulty snaps it back to full.
+
+   A shortened run is **practice and is not scored**: it plays a random slice, so
+   two of them are not the same game and neither is comparable to the full pool.
+   Personal bests only come from playing a whole pool.
+4. **Play.** Click the map to place your pin, click again to adjust, then
    confirm. `Enter` or `Space` also confirms and advances.
 
 ### Scoring
@@ -104,8 +112,9 @@ changes; the menu footer shows which source is loaded.
 Finishing a game files a personal best in `localStorage`, under
 `maptap-learn.records.v3`. Nothing leaves the browser and there is no account.
 
-A best belongs to a *setup* — country and difficulty — because that is what
-makes two scores comparable: a setup always asks about the same places, so
+Only a full run of a pool is scored; the round slider is practice (see **Play**
+above). A best belongs to a *setup* — country and difficulty — because that is
+what makes two scores comparable: a setup always asks about the same places, so
 beating your best means beating it on the same questions. A tie does not
 overwrite a standing best.
 

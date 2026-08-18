@@ -29,6 +29,8 @@ const ui = {
   result: el('result'),
   search: el('country-search'),
   countryList: el('country-list'),
+  rounds: el('round-count'),
+  roundsValue: el('round-count-value'),
   menuSummary: el('menu-summary'),
   menuBest: el('menu-best'),
   start: el('btn-start'),
@@ -41,8 +43,13 @@ const state = {
   countries: [],
   selected: null,      // index entry {code,name,count,bbox}
   difficulty: 'easy',
+  rounds: 0,           // how many of the pool to play; the full pool by default
+  poolKey: null,       // country+difficulty the round slider was last sized for
   game: null,
 };
+
+/** A short run is practice: it plays a random slice, so it sets no records. */
+const isCustomRun = () => state.rounds < poolSize(state.difficulty, state.selected.count);
 
 const view = new MapView('map');
 
@@ -129,15 +136,45 @@ function refreshMenu() {
 
   refreshDifficulties(country);
   const size = poolSize(state.difficulty, country.count);
-  ui.menuSummary.textContent =
-    size === country.count
-      ? `${country.name} · all ${size} places, in a random order.`
-      : `${country.name} · its ${size} biggest places, in a random order.`;
+  refreshRoundSlider(country, size);
+
+  const pick = size === country.count
+    ? `all ${size} places`
+    : `its ${size} biggest places`;
+  ui.menuSummary.textContent = isCustomRun()
+    ? `${country.name} · ${state.rounds} places drawn from ${pick}.`
+    : `${country.name} · ${pick}, in a random order.`;
 
   const best = bestFor(currentSetup(country));
-  ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
+  const practice = isCustomRun();
+  ui.menuBest.classList.toggle('is-practice', practice);
+  if (practice) {
+    ui.menuBest.textContent = 'Practice run — a short game sets no record';
+  } else {
+    ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
+  }
   ui.start.disabled = false;
   ui.start.textContent = `Play ${country.name}`;
+}
+
+/**
+ * Sizes the round slider to the pool. Picking a new country or difficulty snaps
+ * it back to the full pool — the shortened run belongs to the setup you chose it
+ * for, and silently carrying "12 rounds" into a 5-place pool would be nonsense.
+ */
+function refreshRoundSlider(country, size) {
+  const poolKey = `${country.code}:${state.difficulty}`;
+  if (poolKey !== state.poolKey) {
+    state.poolKey = poolKey;
+    state.rounds = size;
+    ui.rounds.max = String(size);
+    ui.rounds.value = String(size);
+  }
+  // A pool of one has nothing to slide.
+  ui.rounds.disabled = size < 2;
+  ui.roundsValue.textContent = isCustomRun()
+    ? `${state.rounds} of ${size}`
+    : `all ${size}`;
 }
 
 function wireDifficulties() {
@@ -165,11 +202,15 @@ async function startGame() {
     return;
   }
 
-  const targets = roundOrder(pool(country, state.difficulty));
+  // Shuffle first, then cut: a short run is a random slice of the pool, not its
+  // biggest few — those are what the easier difficulty already plays.
+  const custom = isCustomRun();
+  const targets = roundOrder(pool(country, state.difficulty)).slice(0, state.rounds);
   state.game = {
     country,
     // Pinned at kick-off: the menu can be re-set before the summary is filed.
     difficulty: state.difficulty,
+    custom,
     scaleKm: countryScaleKm(country.bbox),
     targets,
     index: 0,
@@ -265,10 +306,13 @@ function finishGame() {
   ui.actionbar.hidden = true;
   ui.result.hidden = true;
 
-  const { best: record, previous, isRecord } = saveResult(
-    { code: game.country.code, difficulty: game.difficulty },
-    { avg, total: game.total, places: game.results.length },
-  );
+  // A practice run played a random slice, so there is nothing to compare it to.
+  const filed = game.custom
+    ? null
+    : saveResult(
+        { code: game.country.code, difficulty: game.difficulty },
+        { avg, total: game.total, places: game.results.length },
+      );
 
   el('summary-title').textContent =
     `${game.country.name} · ${game.difficulty} · ${game.results.length} places`;
@@ -277,11 +321,20 @@ function finishGame() {
     `${game.total} points total · best round: ${best.name} (${best.points})`;
 
   const bestLine = el('summary-best');
-  bestLine.classList.toggle('is-record', isRecord);
-  if (isRecord && previous) bestLine.textContent = `★ New best — you beat ${previous.avg} avg`;
-  else if (isRecord) bestLine.textContent = '★ New best — first run at this setup';
-  else bestLine.textContent = `Your best at this setup: ${record.avg} avg`;
-  if (!isPersistent()) bestLine.textContent += ' (this browser is not saving scores)';
+  bestLine.classList.toggle('is-record', Boolean(filed?.isRecord));
+  if (!filed) {
+    const standing = bestFor({ code: game.country.code, difficulty: game.difficulty });
+    bestLine.textContent = standing
+      ? `Practice run — not scored. Your best at this setup: ${standing.avg} avg`
+      : 'Practice run — not scored. Play the full pool to set a best.';
+  } else if (filed.isRecord && filed.previous) {
+    bestLine.textContent = `★ New best — you beat ${filed.previous.avg} avg`;
+  } else if (filed.isRecord) {
+    bestLine.textContent = '★ New best — first run at this setup';
+  } else {
+    bestLine.textContent = `Your best at this setup: ${filed.best.avg} avg`;
+  }
+  if (filed && !isPersistent()) bestLine.textContent += ' (this browser is not saving scores)';
 
   const list = el('summary-list');
   list.innerHTML = '';
@@ -294,7 +347,7 @@ function finishGame() {
     list.append(li);
   }
   ui.summary.hidden = false;
-  if (isRecord) renderCountryList(ui.search.value);
+  if (filed?.isRecord) renderCountryList(ui.search.value);
 }
 
 function quitToMenu() {
@@ -324,6 +377,10 @@ function wireEvents() {
   el('btn-menu').addEventListener('click', quitToMenu);
 
   wireDifficulties();
+  ui.rounds.addEventListener('input', () => {
+    state.rounds = Number(ui.rounds.value);
+    refreshMenu();
+  });
 
   // Enter/Space advances the round without hunting for the button.
   document.addEventListener('keydown', (event) => {
