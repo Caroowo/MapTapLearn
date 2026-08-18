@@ -1,6 +1,9 @@
 /** Shared writer: turns normalized locations into the on-disk dataset. */
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
+// Pure maths, no DOM: one haversine for the game and the build is one haversine
+// that cannot drift between them.
+import { distanceKm } from '../../assets/js/scoring.js';
 
 // A guard rail against one country pulling a huge file, not a curation step:
 // keep it above the largest country in either source, or the tail — which is
@@ -35,6 +38,33 @@ export function bbox(locations) {
   return [round(minLat, 3), round(minLon, 3), round(maxLat, 3), round(maxLon, 3)];
 }
 
+/** How much of a country the map frames — the rest you can still pan to. */
+const VIEW_PERCENTILE = 0.85;
+
+/**
+ * The box the map opens on, which is not the country's full extent.
+ *
+ * France reaches the Kerguelen Islands and Portugal the Azores, so framing the
+ * true bounding box opens a round on half a hemisphere with the country a speck
+ * in the corner. This drops the outlying places and frames what is left, so a
+ * round starts on the part of the country the question is almost always about.
+ * `bbox` still records the real extent.
+ */
+export function viewBox(locations) {
+  if (locations.length < 3) return bbox(locations);
+
+  const lats = locations.map((l) => l.lat).sort((a, b) => a - b);
+  const lons = locations.map((l) => l.lon).sort((a, b) => a - b);
+  const mid = (sorted) => sorted[sorted.length >> 1];
+  const centre = { lat: mid(lats), lon: mid(lons) };
+
+  const distances = locations.map((l) => distanceKm(centre, l)).sort((a, b) => a - b);
+  const limit = distances[Math.floor(VIEW_PERCENTILE * (distances.length - 1))];
+  const kept = locations.filter((l) => distanceKm(centre, l) <= limit);
+
+  return kept.length ? bbox(kept) : bbox(locations);
+}
+
 /** Drops duplicate place names within a country, keeping the most populous. */
 export function dedupe(locations) {
   const seen = new Map();
@@ -66,11 +96,12 @@ export async function emitDataset(byCountry, options) {
     if (locations.length < MIN_PER_COUNTRY) continue;
 
     const box = bbox(locations);
+    const view = viewBox(locations);
     await writeFile(
       path.join(outDir, 'countries', `${code}.json`),
-      JSON.stringify({ code, name, bbox: box, locations }),
+      JSON.stringify({ code, name, bbox: box, view, locations }),
     );
-    index.push({ code, name, count: locations.length, bbox: box });
+    index.push({ code, name, count: locations.length, bbox: box, view });
   }
 
   index.sort((a, b) => a.name.localeCompare(b.name));

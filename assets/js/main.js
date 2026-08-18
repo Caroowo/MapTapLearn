@@ -34,14 +34,13 @@ const ui = {
   menuSummary: el('menu-summary'),
   menuBest: el('menu-best'),
   start: el('btn-start'),
-  confirm: el('btn-confirm'),
   next: el('btn-next'),
   hint: el('action-hint'),
 };
 
 const state = {
   countries: [],
-  selected: null,      // index entry {code,name,count,bbox}
+  selected: null,      // index entry {code,name,count,bbox,view}
   difficulty: 'easy',
   rounds: 0,           // how many of the pool to play; the full pool by default
   poolKey: null,       // country+difficulty the round slider was last sized for
@@ -87,6 +86,13 @@ function renderCountryList(filter = '') {
   }
 }
 
+/**
+ * What the map opens on. `view` trims the outlying places so France does not
+ * start framed on the Indian Ocean; older datasets without one fall back to the
+ * full extent.
+ */
+const framing = (country) => country.view ?? country.bbox;
+
 /** The country's best average across every difficulty and round count. */
 function topBest(code) {
   return bestsForCountry(code).reduce((a, b) => (!a || b.avg > a.avg ? b : a), null);
@@ -119,7 +125,7 @@ function selectCountry(country) {
   for (const li of ui.countryList.children) {
     li.ariaSelected = String(li.dataset.code === country.code);
   }
-  view.frameCountry(country.bbox);
+  view.frameCountry(framing(country));
   refreshMenu();
 }
 
@@ -211,7 +217,7 @@ async function startGame() {
     // Pinned at kick-off: the menu can be re-set before the summary is filed.
     difficulty: state.difficulty,
     custom,
-    scaleKm: countryScaleKm(country.bbox),
+    scaleKm: countryScaleKm(country.locations),
     targets,
     index: 0,
     guess: null,
@@ -234,7 +240,7 @@ function beginRound() {
   game.guess = null;
   game.phase = 'guessing';
   view.clearRound();
-  view.frameCountry(game.country.bbox);
+  view.frameCountry(framing(game.country));
   view.setPicking(true);
 
   el('hud-country').textContent = game.country.name;
@@ -244,23 +250,16 @@ function beginRound() {
 
   ui.result.hidden = true;
   ui.actionbar.hidden = false;
-  ui.hint.textContent = 'Click the map to place your pin';
-  ui.confirm.disabled = true;
-  ui.confirm.textContent = 'Confirm guess';
+  ui.hint.textContent = 'Click the map to drop your pin';
 }
 
+/** One click is the whole guess: placing the pin scores it. */
 function placeGuess(latlon) {
   const game = state.game;
   if (!game || game.phase !== 'guessing') return;
+
   game.guess = latlon;
   view.showGuess(latlon);
-  ui.confirm.disabled = false;
-  ui.hint.textContent = 'Drag or click again to adjust';
-}
-
-function confirmGuess() {
-  const game = state.game;
-  if (!game || game.phase !== 'guessing' || !game.guess) return;
 
   const target = game.targets[game.index];
   const dist = distanceKm(game.guess, target);
@@ -359,7 +358,7 @@ function quitToMenu() {
   ui.result.hidden = true;
   ui.summary.hidden = true;
   ui.menu.hidden = false;
-  if (state.selected) view.frameCountry(state.selected.bbox);
+  if (state.selected) view.frameCountry(framing(state.selected));
   else view.resetView();
   refreshMenu();
 }
@@ -370,7 +369,6 @@ function wireEvents() {
   view.onPick = placeGuess;
   ui.search.addEventListener('input', () => renderCountryList(ui.search.value));
   ui.start.addEventListener('click', startGame);
-  ui.confirm.addEventListener('click', confirmGuess);
   ui.next.addEventListener('click', nextRound);
   el('btn-quit').addEventListener('click', quitToMenu);
   el('btn-again').addEventListener('click', startGame);
@@ -382,14 +380,14 @@ function wireEvents() {
     refreshMenu();
   });
 
-  // Enter/Space advances the round without hunting for the button.
+  // Enter/Space advances the round without hunting for the button. There is
+  // nothing to confirm any more, so it only moves on from a revealed round.
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
     if (event.target instanceof HTMLInputElement) return;
-    if (!state.game) return;
+    if (state.game?.phase !== 'revealed') return;
     event.preventDefault();
-    if (state.game.phase === 'guessing') confirmGuess();
-    else nextRound();
+    nextRound();
   });
 }
 
