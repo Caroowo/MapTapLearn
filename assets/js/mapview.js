@@ -7,11 +7,12 @@ const ESRI_ATTRIBUTION =
   'Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community';
 
 const BORDER_LAYERS = [
-  // Country lines carry the answer to "which country am I in", so they are the
-  // ones you should be able to read at a glance. States are an aid, not the
-  // subject, and stay faint enough not to compete with them.
-  { name: 'countries', url: 'data/borders/countries.json', style: { color: '#ffffff', weight: 1.1, opacity: 0.75 } },
-  { name: 'states', url: 'data/borders/states.json', style: { color: '#ffffff', weight: 0.7, opacity: 0.3, dashArray: '3 4' } },
+  // Both layers have to be legible over satellite imagery, which is busy and
+  // mostly mid-tone. The hierarchy between them comes from weight and the dash
+  // rather than from fading the states out — a line you have to squint at is not
+  // much use as an aid.
+  { name: 'countries', url: 'data/borders/countries.json', style: { color: '#ffffff', weight: 1.8, opacity: 0.95 } },
+  { name: 'states', url: 'data/borders/states.json', style: { color: '#ffffff', weight: 1.1, opacity: 0.7, dashArray: '5 4' } },
 ];
 
 function dot(kind, label) {

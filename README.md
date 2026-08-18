@@ -28,12 +28,15 @@ static host, including GitHub Pages.
    are in that position.
 3. **Optionally shorten it.** The slider under the difficulty runs from 1 to the
    pool size and starts at the full pool. Pull it down for a quick run — 25 of
-   Germany's 97, say — and the game plays a random slice of the pool instead of
-   all of it. Picking a different country or difficulty snaps it back to full.
+   Germany's 97, say — and the game plays the **25 biggest** places of that pool,
+   in a random order. Picking a different country or difficulty snaps it back to
+   full.
 
-   A shortened run is **practice and is not scored**: it plays a random slice, so
-   two of them are not the same game and neither is comparable to the full pool.
-   Personal bests only come from playing a whole pool.
+   A shortened run is **practice and is not scored**. It is perfectly repeatable,
+   so it could be, but a best is stored per country and difficulty; scoring
+   shortened runs would mean putting a round count back into what identifies a
+   record, which is exactly what difficulty replaced. Personal bests come from
+   playing a whole pool.
 4. **Play.** One click on the map is the guess — it drops the pin and scores it
    at once, with no confirm step. `Enter` or `Space` moves on to the next round.
 
@@ -96,9 +99,12 @@ layer is drawn, so the answer is never simply readable off the basemap.
 ### Borders
 
 The **Borders** button on the map toggles administrative boundaries: country
-lines solid and legible, state and province lines thinner, fainter and dashed so
-they read as background. Both are line-only and carry no names — a label layer
-would hand over the answer the round is asking for.
+lines solid and heavier, state and province lines thinner and dashed. Both are
+sized to stay legible over satellite imagery, which is busy and mostly mid-tone —
+the hierarchy between them comes from weight and the dash rather than from fading
+the states out, since a line you have to squint at is not much use as an aid.
+Both are line-only and carry no names: a label layer would hand over the answer
+the round is asking for.
 
 The two layers are ~1.2 MB together, so they are fetched the first time the
 button is pressed rather than on every page load, and kept for the session. They
