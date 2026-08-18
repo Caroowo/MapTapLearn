@@ -1,6 +1,6 @@
 /** MapTap Learn — menu, game loop and result reporting. */
 
-import { loadIndex, loadCountry, pool, poolSize, drawRounds } from './data.js';
+import { loadIndex, loadCountry, pool, poolSize, selectRounds } from './data.js';
 import {
   distanceKm,
   countryScaleKm,
@@ -118,7 +118,7 @@ function refreshMenu() {
 
   const size = poolSize(state.difficulty, total);
   const rounds = Math.min(state.rounds, size);
-  ui.menuSummary.textContent = `${country.name} · ${rounds} rounds drawn from its ${size} biggest places.`;
+  ui.menuSummary.textContent = `${country.name} · ${rounds} rounds spread across its ${size} biggest places.`;
 
   const best = bestFor(currentSetup(country));
   ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
@@ -155,7 +155,7 @@ async function startGame() {
     return;
   }
 
-  const targets = drawRounds(pool(country, state.difficulty), state.rounds);
+  const targets = selectRounds(pool(country, state.difficulty), state.rounds);
   state.game = {
     country,
     // Pinned at kick-off: the menu can be re-set before the summary is filed.

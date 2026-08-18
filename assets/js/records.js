@@ -12,8 +12,10 @@
  * playing with bests held in memory for the session.
  */
 
-const KEY = 'maptap-learn.records.v1';
-const VERSION = 1;
+// v2: rounds became a fixed selection per setup. Bests set against the old
+// random draw were not runs anyone can repeat, so they do not carry over.
+const KEY = 'maptap-learn.records.v2';
+const VERSION = 2;
 
 /** Parsed records, loaded once. Also the whole store when localStorage is out. */
 let cache = null;

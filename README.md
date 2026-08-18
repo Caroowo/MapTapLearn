@@ -18,6 +18,14 @@ static host, including GitHub Pages.
    | Hard | every place in the country |
    Places are ordered by population, so easy asks about the ones you are most
    likely to know and hard reaches into small towns.
+
+   A given setup always plays the same places, only in a different order, so two
+   runs are comparable and a personal best is a target you can actually chase.
+   The rounds are spread evenly across the pool by population rank rather than
+   taken off the top: the pools are nested, so "the top five" would hand easy,
+   medium and hard the identical five cities. Every game includes the country's
+   biggest place; how far down the ranks the rest reach is what the difficulty
+   changes.
 3. **Pick a round count** (5 / 10 / 20) and play. Click the map to place your
    pin, click again to adjust, then confirm. `Enter` or `Space` also confirms
    and advances.
@@ -48,7 +56,8 @@ data/countries/DE.json     # { code, name, bbox, locations: [{ name, lat, lon, p
 ```
 
 Locations are sorted by population descending (that ordering *is* the difficulty
-mechanic) and capped at 700 per country so no round pulls a large file. The cap
+mechanic — the app never re-sorts, it slices) and capped at 700 per country so no
+round pulls a large file. The cap
 is a guard rail rather than curation — places with no population sort last, so a
 cap tighter than the biggest country deletes landmarks (at 300 the US lost
 Alcatraz, China the Forbidden City and Everest) rather than trimming filler.
@@ -94,14 +103,19 @@ changes; the menu footer shows which source is loaded.
 ## Scores
 
 Finishing a game files a personal best in `localStorage`, under
-`maptap-learn.records.v1`. Nothing leaves the browser and there is no account.
+`maptap-learn.records.v2`. Nothing leaves the browser and there is no account.
 
 A best belongs to a *setup* — country, difficulty and the number of rounds
-actually played — because that is what makes two scores comparable; averaging 80
-over 5 rounds and over 20 rounds are different achievements, so they get their
-own records. The rounds that count are the ones played, not the ones asked for:
-picking 20 rounds in a 10-place pool plays 10 and records against 10. A tie does
-not overwrite a standing best.
+actually played — because that is what makes two scores comparable: a setup
+always plays the same places, so beating your best means beating it on the same
+questions. (The key carries a version for that reason. Bests recorded before the
+selection was fixed came from a random draw, so `v2` starts them over rather than
+letting runs that were never repeatable stand as records.)
+
+Beyond the places, averaging 80 over 5 rounds and over 20 rounds are different
+achievements, so they get their own records. The rounds that count are the ones
+played, not the ones asked for: picking 20 rounds in a 10-place pool plays 10 and
+records against 10. A tie does not overwrite a standing best.
 
 Bests show up in three places: a ★ badge in the country list (that country's best
 across every setup), a line under the menu summary (the best for the exact setup
