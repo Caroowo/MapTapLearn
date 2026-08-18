@@ -74,25 +74,12 @@
 
       <div class="field">
         <span class="field-label">Difficulty</span>
+        <!-- Buttons a country is too small for are hidden, never disabled: an
+             option you cannot pick is not worth a slot in the line. -->
         <div class="segmented" role="radiogroup" aria-label="Difficulty">
-          <button type="button" class="seg is-active" data-difficulty="easy" role="radio" aria-checked="true">
-            <strong>Easy</strong><small id="pool-easy">top 10</small>
-          </button>
-          <button type="button" class="seg" data-difficulty="medium" role="radio" aria-checked="false">
-            <strong>Medium</strong><small id="pool-medium">top half</small>
-          </button>
-          <button type="button" class="seg" data-difficulty="hard" role="radio" aria-checked="false">
-            <strong>Hard</strong><small id="pool-hard">everything</small>
-          </button>
-        </div>
-      </div>
-
-      <div class="field">
-        <span class="field-label">Rounds</span>
-        <div class="segmented" role="radiogroup" aria-label="Rounds">
-          <button type="button" class="seg is-active" data-rounds="5" role="radio" aria-checked="true">5</button>
-          <button type="button" class="seg" data-rounds="10" role="radio" aria-checked="false">10</button>
-          <button type="button" class="seg" data-rounds="20" role="radio" aria-checked="false">20</button>
+          <button type="button" class="seg is-active" data-difficulty="easy" role="radio" aria-checked="true">Easy</button>
+          <button type="button" class="seg" data-difficulty="medium" role="radio" aria-checked="false">Medium</button>
+          <button type="button" class="seg" data-difficulty="hard" role="radio" aria-checked="false">Hard</button>
         </div>
       </div>
 

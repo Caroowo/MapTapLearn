@@ -1,10 +1,9 @@
 /**
  * Personal bests, kept in localStorage.
  *
- * A best is stored per setup — country, difficulty and the number of rounds
- * actually played — because those are what make a score comparable. Averaging
- * 80 over 5 rounds and over 20 rounds are different achievements, so they do
- * not overwrite each other.
+ * A best is stored per setup — country and difficulty — because that is what
+ * makes two scores comparable: a setup always asks about the same places, so
+ * beating your best means beating it on the same questions.
  *
  * Storage is best-effort: reading or writing localStorage throws outright in
  * some browsers (private mode, cookies disabled, a `file://` page under a strict
@@ -12,10 +11,11 @@
  * playing with bests held in memory for the session.
  */
 
-// v2: rounds became a fixed selection per setup. Bests set against the old
-// random draw were not runs anyone can repeat, so they do not carry over.
-const KEY = 'maptap-learn.records.v2';
-const VERSION = 2;
+// v3: difficulty became the whole setup — a game plays its entire pool, so the
+// round count is no longer part of what identifies a run, and earlier bests were
+// scored on a different set of places.
+const KEY = 'maptap-learn.records.v3';
+const VERSION = 3;
 
 /** Parsed records, loaded once. Also the whole store when localStorage is out. */
 let cache = null;
@@ -73,38 +73,35 @@ export function isPersistent() {
   return persistent;
 }
 
-/** @param {{code:string, difficulty:string, rounds:number}} setup */
-function keyFor({ code, difficulty, rounds }) {
-  return `${code}:${difficulty}:${rounds}`;
+/** @param {{code:string, difficulty:string}} setup */
+function keyFor({ code, difficulty }) {
+  return `${code}:${difficulty}`;
 }
 
 /**
- * @param {{code:string, difficulty:string, rounds:number}} setup
- * @returns {{avg:number, total:number, at:string}|null}
+ * @param {{code:string, difficulty:string}} setup
+ * @returns {{avg:number, total:number, places:number, at:string}|null}
  */
 export function bestFor(setup) {
   return load()[keyFor(setup)] ?? null;
 }
 
-/** Every stored best for a country, whatever the difficulty or round count. */
+/** Every stored best for a country, whatever the difficulty. */
 export function bestsForCountry(code) {
   const prefix = `${code}:`;
   return Object.entries(load())
     .filter(([key]) => key.startsWith(prefix))
-    .map(([key, record]) => {
-      const [, difficulty, rounds] = key.split(':');
-      return { difficulty, rounds: Number(rounds), ...record };
-    });
+    .map(([key, record]) => ({ difficulty: key.slice(prefix.length), ...record }));
 }
 
 /**
  * Files a finished game.
- * @param {{code:string, difficulty:string, rounds:number}} setup
- * @param {{avg:number, total:number}} result
+ * @param {{code:string, difficulty:string}} setup
+ * @param {{avg:number, total:number, places:number}} result
  * @returns {{best:object, previous:object|null, isRecord:boolean}} `best` is the
  *   record that now stands — the new one only if it beat what was there.
  */
-export function saveResult(setup, { avg, total }) {
+export function saveResult(setup, { avg, total, places }) {
   const bests = load();
   const key = keyFor(setup);
   const previous = bests[key] ?? null;
@@ -112,7 +109,7 @@ export function saveResult(setup, { avg, total }) {
   const isRecord = !previous || avg > previous.avg;
 
   if (isRecord) {
-    bests[key] = { avg, total, at: new Date().toISOString() };
+    bests[key] = { avg, total, places, at: new Date().toISOString() };
     persist();
   }
   return { best: bests[key], previous, isRecord };

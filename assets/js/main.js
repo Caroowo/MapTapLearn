@@ -1,6 +1,13 @@
 /** MapTap Learn — menu, game loop and result reporting. */
 
-import { loadIndex, loadCountry, pool, poolSize, selectRounds } from './data.js';
+import {
+  loadIndex,
+  loadCountry,
+  pool,
+  poolSize,
+  roundOrder,
+  availableDifficulties,
+} from './data.js';
 import {
   distanceKm,
   countryScaleKm,
@@ -34,7 +41,6 @@ const state = {
   countries: [],
   selected: null,      // index entry {code,name,count,bbox}
   difficulty: 'easy',
-  rounds: 5,
   game: null,
 };
 
@@ -79,16 +85,26 @@ function topBest(code) {
   return bestsForCountry(code).reduce((a, b) => (!a || b.avg > a.avg ? b : a), null);
 }
 
-/**
- * A best belongs to a setup, and the rounds that count are the ones actually
- * played — asking for 20 in a 10-place pool plays 10.
- */
 function currentSetup(country = state.selected) {
-  return {
-    code: country.code,
-    difficulty: state.difficulty,
-    rounds: Math.min(state.rounds, poolSize(state.difficulty, country.count)),
-  };
+  return { code: country.code, difficulty: state.difficulty };
+}
+
+/**
+ * Shows only the difficulties this country is big enough for, and moves the
+ * selection off one that just disappeared — onto the easiest still standing,
+ * since that is what the vanished button was.
+ */
+function refreshDifficulties(country) {
+  const available = availableDifficulties(country.count);
+  if (!available.includes(state.difficulty)) state.difficulty = available[0];
+
+  for (const button of document.querySelectorAll('[data-difficulty]')) {
+    const key = button.dataset.difficulty;
+    const on = key === state.difficulty;
+    button.hidden = !available.includes(key);
+    button.classList.toggle('is-active', on);
+    button.ariaChecked = String(on);
+  }
 }
 
 function selectCountry(country) {
@@ -102,11 +118,6 @@ function selectCountry(country) {
 
 function refreshMenu() {
   const country = state.selected;
-  const total = country?.count ?? 0;
-
-  el('pool-easy').textContent = country ? `${poolSize('easy', total)} places` : 'top 10';
-  el('pool-medium').textContent = country ? `${poolSize('medium', total)} places` : 'top half';
-  el('pool-hard').textContent = country ? `${total} places` : 'everything';
 
   if (!country) {
     ui.menuSummary.textContent = '';
@@ -116,9 +127,12 @@ function refreshMenu() {
     return;
   }
 
-  const size = poolSize(state.difficulty, total);
-  const rounds = Math.min(state.rounds, size);
-  ui.menuSummary.textContent = `${country.name} · ${rounds} rounds spread across its ${size} biggest places.`;
+  refreshDifficulties(country);
+  const size = poolSize(state.difficulty, country.count);
+  ui.menuSummary.textContent =
+    size === country.count
+      ? `${country.name} · all ${size} places, in a random order.`
+      : `${country.name} · its ${size} biggest places, in a random order.`;
 
   const best = bestFor(currentSetup(country));
   ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
@@ -126,14 +140,10 @@ function refreshMenu() {
   ui.start.textContent = `Play ${country.name}`;
 }
 
-function wireSegmented(selector, key, cast = String) {
-  for (const button of document.querySelectorAll(selector)) {
+function wireDifficulties() {
+  for (const button of document.querySelectorAll('[data-difficulty]')) {
     button.addEventListener('click', () => {
-      for (const sibling of button.parentElement.children) {
-        sibling.classList.toggle('is-active', sibling === button);
-        sibling.ariaChecked = String(sibling === button);
-      }
-      state[key] = cast(button.dataset[key]);
+      state.difficulty = button.dataset.difficulty;
       refreshMenu();
     });
   }
@@ -155,7 +165,7 @@ async function startGame() {
     return;
   }
 
-  const targets = selectRounds(pool(country, state.difficulty), state.rounds);
+  const targets = roundOrder(pool(country, state.difficulty));
   state.game = {
     country,
     // Pinned at kick-off: the menu can be re-set before the summary is filed.
@@ -256,12 +266,12 @@ function finishGame() {
   ui.result.hidden = true;
 
   const { best: record, previous, isRecord } = saveResult(
-    { code: game.country.code, difficulty: game.difficulty, rounds: game.results.length },
-    { avg, total: game.total },
+    { code: game.country.code, difficulty: game.difficulty },
+    { avg, total: game.total, places: game.results.length },
   );
 
   el('summary-title').textContent =
-    `${game.country.name} · ${game.difficulty} · ${game.results.length} rounds`;
+    `${game.country.name} · ${game.difficulty} · ${game.results.length} places`;
   el('summary-avg').textContent = String(avg);
   el('summary-line').textContent =
     `${game.total} points total · best round: ${best.name} (${best.points})`;
@@ -313,8 +323,7 @@ function wireEvents() {
   el('btn-again').addEventListener('click', startGame);
   el('btn-menu').addEventListener('click', quitToMenu);
 
-  wireSegmented('[data-difficulty]', 'difficulty');
-  wireSegmented('[data-rounds]', 'rounds', Number);
+  wireDifficulties();
 
   // Enter/Space advances the round without hunting for the button.
   document.addEventListener('keydown', (event) => {
