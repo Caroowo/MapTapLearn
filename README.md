@@ -91,6 +91,28 @@ npm run build:data     # regenerate from GeoNames instead
 Both scripts write the identical on-disk shape, so swapping sources needs no app
 changes; the menu footer shows which source is loaded.
 
+## Scores
+
+Finishing a game files a personal best in `localStorage`, under
+`maptap-learn.records.v1`. Nothing leaves the browser and there is no account.
+
+A best belongs to a *setup* — country, difficulty and the number of rounds
+actually played — because that is what makes two scores comparable; averaging 80
+over 5 rounds and over 20 rounds are different achievements, so they get their
+own records. The rounds that count are the ones played, not the ones asked for:
+picking 20 rounds in a 10-place pool plays 10 and records against 10. A tie does
+not overwrite a standing best.
+
+Bests show up in three places: a ★ badge in the country list (that country's best
+across every setup), a line under the menu summary (the best for the exact setup
+selected), and the end-of-game panel, which says whether the run beat it.
+
+Storage is best-effort. Reading or writing `localStorage` throws outright in some
+browsers — private mode, cookies disabled, a `file://` page under a strict policy
+— so every access is guarded and a failure degrades to bests held in memory for
+the session; the summary says so rather than the game breaking. `clearRecords()`
+in `assets/js/records.js` wipes them.
+
 ## Run locally
 
 ```bash
@@ -118,6 +140,7 @@ fit the existing round loop — they only need a different pool builder in
 ```
 index.html              markup for menu, HUD, result and summary
 assets/js/main.js       menu, game loop, result reporting
+assets/js/records.js    personal bests in localStorage
 assets/js/data.js       dataset loading, difficulty pools, round draw
 assets/js/scoring.js    great-circle distance, 1–100 score
 assets/js/mapview.js    Leaflet wrapper: basemap, pins, reveal

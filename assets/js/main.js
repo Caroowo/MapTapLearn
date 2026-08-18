@@ -10,6 +10,7 @@ import {
   formatDistance,
 } from './scoring.js';
 import { MapView } from './mapview.js';
+import { bestFor, bestsForCountry, saveResult, isPersistent } from './records.js';
 
 const el = (id) => document.getElementById(id);
 
@@ -22,6 +23,7 @@ const ui = {
   search: el('country-search'),
   countryList: el('country-list'),
   menuSummary: el('menu-summary'),
+  menuBest: el('menu-best'),
   start: el('btn-start'),
   confirm: el('btn-confirm'),
   next: el('btn-next'),
@@ -62,10 +64,31 @@ function renderCountryList(filter = '') {
     li.role = 'option';
     li.dataset.code = country.code;
     li.ariaSelected = String(state.selected?.code === country.code);
-    li.innerHTML = `<span>${country.name}</span><span class="count">${country.count}</span>`;
+    const best = topBest(country.code);
+    li.innerHTML =
+      `<span>${country.name}</span>` +
+      (best ? `<span class="best" title="Your best average here">★ ${best.avg}</span>` : '') +
+      `<span class="count">${country.count}</span>`;
     li.addEventListener('click', () => selectCountry(country));
     ui.countryList.append(li);
   }
+}
+
+/** The country's best average across every difficulty and round count. */
+function topBest(code) {
+  return bestsForCountry(code).reduce((a, b) => (!a || b.avg > a.avg ? b : a), null);
+}
+
+/**
+ * A best belongs to a setup, and the rounds that count are the ones actually
+ * played — asking for 20 in a 10-place pool plays 10.
+ */
+function currentSetup(country = state.selected) {
+  return {
+    code: country.code,
+    difficulty: state.difficulty,
+    rounds: Math.min(state.rounds, poolSize(state.difficulty, country.count)),
+  };
 }
 
 function selectCountry(country) {
@@ -87,6 +110,7 @@ function refreshMenu() {
 
   if (!country) {
     ui.menuSummary.textContent = '';
+    ui.menuBest.textContent = '';
     ui.start.disabled = true;
     ui.start.textContent = 'Pick a country';
     return;
@@ -95,6 +119,9 @@ function refreshMenu() {
   const size = poolSize(state.difficulty, total);
   const rounds = Math.min(state.rounds, size);
   ui.menuSummary.textContent = `${country.name} · ${rounds} rounds drawn from its ${size} biggest places.`;
+
+  const best = bestFor(currentSetup(country));
+  ui.menuBest.textContent = best ? `★ Best at this setup: ${best.avg} avg` : '';
   ui.start.disabled = false;
   ui.start.textContent = `Play ${country.name}`;
 }
@@ -131,6 +158,8 @@ async function startGame() {
   const targets = drawRounds(pool(country, state.difficulty), state.rounds);
   state.game = {
     country,
+    // Pinned at kick-off: the menu can be re-set before the summary is filed.
+    difficulty: state.difficulty,
     scaleKm: countryScaleKm(country.bbox),
     targets,
     index: 0,
@@ -226,10 +255,23 @@ function finishGame() {
   ui.actionbar.hidden = true;
   ui.result.hidden = true;
 
-  el('summary-title').textContent = `${game.country.name} · ${game.results.length} rounds`;
+  const { best: record, previous, isRecord } = saveResult(
+    { code: game.country.code, difficulty: game.difficulty, rounds: game.results.length },
+    { avg, total: game.total },
+  );
+
+  el('summary-title').textContent =
+    `${game.country.name} · ${game.difficulty} · ${game.results.length} rounds`;
   el('summary-avg').textContent = String(avg);
   el('summary-line').textContent =
     `${game.total} points total · best round: ${best.name} (${best.points})`;
+
+  const bestLine = el('summary-best');
+  bestLine.classList.toggle('is-record', isRecord);
+  if (isRecord && previous) bestLine.textContent = `★ New best — you beat ${previous.avg} avg`;
+  else if (isRecord) bestLine.textContent = '★ New best — first run at this setup';
+  else bestLine.textContent = `Your best at this setup: ${record.avg} avg`;
+  if (!isPersistent()) bestLine.textContent += ' (this browser is not saving scores)';
 
   const list = el('summary-list');
   list.innerHTML = '';
@@ -242,6 +284,7 @@ function finishGame() {
     list.append(li);
   }
   ui.summary.hidden = false;
+  if (isRecord) renderCountryList(ui.search.value);
 }
 
 function quitToMenu() {
