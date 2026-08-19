@@ -252,7 +252,31 @@ html, body {
 .soon { display: block; font-size: 9px; text-transform: uppercase; letter-spacing: 0.08em; }
 
 .field { margin-bottom: 16px; }
+.field-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sorts { display: flex; gap: 4px; margin-bottom: 7px; }
+.sort {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 2px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sort:hover { color: var(--text); }
+.sort.is-active { color: var(--accent); border-color: rgba(76, 194, 255, 0.45); }
+
 .field > label,
+.field-head > label,
 .field-label {
   display: block;
   margin-bottom: 7px;

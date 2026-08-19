@@ -86,14 +86,6 @@ export function bestFor(setup) {
   return load()[keyFor(setup)] ?? null;
 }
 
-/** Every stored best for a country, whatever the difficulty. */
-export function bestsForCountry(code) {
-  const prefix = `${code}:`;
-  return Object.entries(load())
-    .filter(([key]) => key.startsWith(prefix))
-    .map(([key, record]) => ({ difficulty: key.slice(prefix.length), ...record }));
-}
-
 /**
  * Files a finished game.
  * @param {{code:string, difficulty:string}} setup
