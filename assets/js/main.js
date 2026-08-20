@@ -52,7 +52,38 @@ const state = {
 /** A short run is practice: it plays a random slice, so it sets no records. */
 const isCustomRun = () => state.rounds < poolSize(state.difficulty, state.selected.count);
 
-const view = new MapView('map');
+/**
+ * The renderer. `?renderer=globe` swaps the flat Leaflet map for the
+ * experimental 3D globe; both expose the same handful of methods, so nothing
+ * below this line knows which one it is driving.
+ */
+let view;
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const tag = document.createElement('script');
+    tag.src = src;
+    tag.onload = resolve;
+    tag.onerror = () => reject(new Error(`could not load ${src}`));
+    document.head.append(tag);
+  });
+}
+
+async function createView() {
+  if (new URLSearchParams(location.search).get('renderer') !== 'globe') {
+    return new MapView('map');
+  }
+  try {
+    // 1.7 MB of three.js, so it is fetched only when actually asked for.
+    await loadScript('vendor/globe/globe.gl.min.js');
+    const { GlobeView } = await import('./globeview.js');
+    return new GlobeView('map');
+  } catch (err) {
+    // A prototype renderer failing should not cost you the game.
+    console.error('Globe renderer unavailable, falling back to the map:', err);
+    return new MapView('map');
+  }
+}
 
 /* ------------------------------------------------------------------ menu */
 
@@ -459,6 +490,7 @@ function wireEvents() {
 }
 
 async function boot() {
+  view = await createView();
   wireEvents();
   try {
     const index = await loadIndex();

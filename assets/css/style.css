@@ -394,6 +394,36 @@ html, body {
 .summary-actions { display: flex; gap: 8px; }
 .summary-actions .btn { flex: 1; }
 
+/* ---------- globe renderer (?renderer=globe) ---------- */
+
+/* globe.gl positions this wrapper; the pin inside keeps its own size, and
+   nothing here may swallow a click meant for the globe underneath. */
+.pin-marker {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+
+.globe-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 24px;
+  z-index: 700;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.globe-controls .borders-btn {
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--panel-solid);
+  color: var(--text);
+  height: 30px;
+  line-height: 28px;
+  cursor: pointer;
+}
+
 /* ---------- map markers ---------- */
 
 .pin {

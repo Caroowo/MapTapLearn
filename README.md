@@ -108,6 +108,31 @@ Esri **World Imagery** satellite tiles (free, no key, no sign-up) rendered with
 the game has no CDN dependency at runtime. Zoom is capped at z17 and no label
 layer is drawn, so the answer is never simply readable off the basemap.
 
+### Experimental: 3D globe
+
+`?renderer=globe` swaps the flat map for a WebGL globe — the same game, drawn on
+a sphere. It is a prototype, off by default.
+
+```
+index.html?renderer=globe
+```
+
+It is built on [globe.gl](https://github.com/vasturiano/globe.gl) (MIT, vendored
+under `vendor/globe/`), which wraps three-globe and three.js, and it streams the
+*same* Esri tiles through globe.gl's slippy tile engine. `assets/js/globeview.js`
+exposes the same handful of methods as `mapview.js` — `onPick`, `setPicking`,
+`showGuess`, `reveal`, `clearRound`, `frameCountry`, `resetView` — so `main.js`
+does not know which renderer it is driving.
+
+Nothing else changed to support it, which is the point: the dataset is lat/lon
+and the scoring is great-circle, so neither cares about the projection. The
+border overlays are reused as-is, and the pins are the same DOM elements with the
+same CSS, positioned by the globe instead of by Leaflet.
+
+The cost is the library: **1.71 MB** (491 KB gzipped) of three.js, fetched only
+when the flag is set, and WebGL becomes a hard requirement rather than a nicety.
+If it fails to load, the game falls back to the flat map rather than breaking.
+
 ### Borders
 
 The **Borders** button on the map toggles administrative boundaries: country
@@ -183,6 +208,31 @@ npm run build:data     # regenerate from GeoNames instead
 
 Both scripts write the identical on-disk shape, so swapping sources needs no app
 changes; the menu footer shows which source is loaded.
+
+### Experimental: 3D globe
+
+`?renderer=globe` swaps the flat map for a WebGL globe — the same game, drawn on
+a sphere. It is a prototype, off by default.
+
+```
+index.html?renderer=globe
+```
+
+It is built on [globe.gl](https://github.com/vasturiano/globe.gl) (MIT, vendored
+under `vendor/globe/`), which wraps three-globe and three.js, and it streams the
+*same* Esri tiles through globe.gl's slippy tile engine. `assets/js/globeview.js`
+exposes the same handful of methods as `mapview.js` — `onPick`, `setPicking`,
+`showGuess`, `reveal`, `clearRound`, `frameCountry`, `resetView` — so `main.js`
+does not know which renderer it is driving.
+
+Nothing else changed to support it, which is the point: the dataset is lat/lon
+and the scoring is great-circle, so neither cares about the projection. The
+border overlays are reused as-is, and the pins are the same DOM elements with the
+same CSS, positioned by the globe instead of by Leaflet.
+
+The cost is the library: **1.71 MB** (491 KB gzipped) of three.js, fetched only
+when the flag is set, and WebGL becomes a hard requirement rather than a nicety.
+If it fails to load, the game falls back to the flat map rather than breaking.
 
 ### Borders
 
