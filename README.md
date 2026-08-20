@@ -13,7 +13,15 @@ static host, including GitHub Pages.
 
 ## Play
 
-1. **Pick a country** — search the list; the number is how many places it has.
+1. **Pick a country** — search the list, or sort it. **A–Z** is the default,
+   **Places** ranks by how many places a country has, and **Best** ranks by your
+   own best score. Clicking the sort you are already on turns it around.
+
+   Sorting by *Best* — and the ★ badges in the list — follow the difficulty
+   selected below, because a best only means something within one: ranking your
+   easy runs against your hard ones would compare different games. Countries you
+   have not played in that difficulty sort to the bottom rather than counting as
+   a zero.
 2. **Pick a difficulty** — that is the whole setup. A game asks about every
    place in the pool, in a random order:
    | Difficulty | Pool | Germany (97 places) |

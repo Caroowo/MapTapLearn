@@ -66,7 +66,14 @@
       </nav>
 
       <div class="field">
-        <label for="country-search">Country</label>
+        <div class="field-head">
+          <label for="country-search">Country</label>
+          <div class="sorts" role="group" aria-label="Sort countries">
+            <button type="button" class="sort is-active" data-sort="name" aria-pressed="true">A–Z</button>
+            <button type="button" class="sort" data-sort="places" aria-pressed="false">Places</button>
+            <button type="button" class="sort" data-sort="best" aria-pressed="false">Best</button>
+          </div>
+        </div>
         <input id="country-search" type="search" placeholder="Search countries…" autocomplete="off" spellcheck="false" />
         <ul id="country-list" class="country-list" role="listbox" aria-label="Countries"></ul>
       </div>
