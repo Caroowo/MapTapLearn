@@ -133,6 +133,18 @@ export function scoreBand(score) {
   return 'score-bad';
 }
 
+/**
+ * A place's population, or null when the dataset does not know it.
+ *
+ * The scraper stores an unknown population as 1 rather than dropping the place,
+ * so landmarks and mountains keep their slot at the bottom of the pool. That
+ * sentinel is not a fact about the place, so it is never shown as one.
+ */
+export function formatPopulation(pop) {
+  if (!Number.isFinite(pop) || pop <= 1) return null;
+  return Math.round(pop).toLocaleString();
+}
+
 export function formatDistance(km) {
   if (km < 1) return `${Math.round(km * 1000)} m`;
   if (km < 10) return `${km.toFixed(1)} km`;
