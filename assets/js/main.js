@@ -15,6 +15,7 @@ import {
   verdict,
   scoreBand,
   formatDistance,
+  formatPopulation,
 } from './scoring.js';
 import { MapView } from './mapview.js';
 import { bestFor, saveResult, isPersistent } from './records.js';
@@ -345,6 +346,13 @@ function placeGuess(latlon) {
   el('result-points').textContent = String(points);
   el('result-verdict').textContent = verdict(points);
   el('result-distance').textContent = `${formatDistance(dist)} from ${target.name}`;
+
+  // Population is a fact about the place worth learning alongside where it is.
+  // Places the dataset has no figure for simply drop the line.
+  const people = formatPopulation(target.pop);
+  const popLine = el('result-pop');
+  popLine.hidden = people === null;
+  popLine.textContent = people === null ? '' : `Population ${people}`;
   ui.next.textContent =
     game.index + 1 < game.targets.length ? 'Next round' : 'See results';
   ui.next.focus();

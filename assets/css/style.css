@@ -116,6 +116,24 @@ html, body {
 
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Chrome you click rather than read: a stray double-click or a drag off a
+   button would otherwise leave its label highlighted. Prose and the search box
+   stay selectable. */
+.btn,
+.icon-btn,
+.mode,
+.sort,
+.seg,
+.hud-label,
+.field > label,
+.field-head > label,
+.field-label,
+.country-list li,
+.summary-actions {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* ---------- HUD ---------- */
 
 .hud {
@@ -208,7 +226,11 @@ html, body {
 }
 .result-outof { color: var(--muted); font-size: 13px; }
 .result-verdict { margin: 6px 0 2px; font-weight: 600; }
-.result-distance { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+/* Spacing lives on the button, so the panel keeps its shape whether or not the
+   place has a population to show. */
+.result-distance { margin: 0; color: var(--muted); font-size: 13px; }
+.result-pop { margin: 4px 0 0; color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+.result .btn { margin-top: 14px; }
 .score-good .result-points { color: var(--good); }
 .score-mid .result-points { color: var(--warn); }
 .score-bad .result-points { color: var(--bad); }
