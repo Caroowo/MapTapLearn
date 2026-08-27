@@ -38,6 +38,10 @@ const ui = {
   start: el('btn-start'),
   next: el('btn-next'),
   hint: el('action-hint'),
+  review: el('btn-review'),
+  legend: el('summary-legend'),
+  peek: el('btn-peek'),
+  unpeek: el('btn-unpeek'),
 };
 
 const state = {
@@ -48,6 +52,8 @@ const state = {
   rounds: 0,           // how many of the pool to play; the full pool by default
   poolKey: null,       // country+difficulty the round slider was last sized for
   game: null,
+  reviewing: false,    // the finished run is drawn on the map
+  focused: null,       // the round singled out of that run, if any
 };
 
 /** A short run is practice: it plays a random slice, so it sets no records. */
@@ -295,6 +301,8 @@ async function startGame() {
 
   ui.menu.hidden = true;
   ui.summary.hidden = true;
+  setReviewing(false);
+  view.clearReview();
   ui.hud.hidden = false;
   refreshMenu();
   beginRound();
@@ -334,7 +342,15 @@ function placeGuess(latlon) {
 
   game.phase = 'revealed';
   game.total += points;
-  game.results.push({ name: target.name, distKm: dist, points });
+  // The coordinates are kept so the finish screen can lay the whole run back
+  // out on the map, which is where a miss actually means something.
+  game.results.push({
+    name: target.name,
+    distKm: dist,
+    points,
+    guess: { ...game.guess },
+    actual: { lat: target.lat, lon: target.lon },
+  });
 
   view.setPicking(false);
   view.reveal(game.guess, target, target.name);
@@ -375,6 +391,9 @@ function finishGame() {
   const best = game.results.reduce((a, b) => (b.points > a.points ? b : a));
 
   view.setPicking(false);
+  // The last round's own pins go: the run about to be drawn includes them, and
+  // two markers on one spot in different colours reads as a bug.
+  view.clearRound();
   ui.hud.hidden = true;
   ui.actionbar.hidden = true;
   ui.result.hidden = true;
@@ -411,22 +430,111 @@ function finishGame() {
 
   const list = el('summary-list');
   list.innerHTML = '';
-  for (const r of game.results) {
+  for (const [i, r] of game.results.entries()) {
     const li = document.createElement('li');
+    // A row is the round's handle on the map, so it is a button, not a line of
+    // text: clicking it opens the run and zooms to that one miss.
     li.innerHTML =
-      `<span>${r.name}</span>` +
+      `<button type="button" class="s-row ${scoreBand(r.points)}" data-round="${i}">` +
+      `<span class="s-name">${r.name}</span>` +
       `<span class="s-dist">${formatDistance(r.distKm)}</span>` +
-      `<span class="s-pts ${scoreBand(r.points)}">${r.points}</span>`;
+      `<span class="s-pts ${scoreBand(r.points)}">${r.points}</span>` +
+      `</button>`;
+    li.querySelector('.s-row').addEventListener('click', () => focusRound(i));
     list.append(li);
   }
+  // The run is built now but kept off the map: the summary opens on the numbers,
+  // and the pins are one button away for when you want to see where they landed.
+  view.showReview(
+    game.results.map((r) => ({ name: r.name, band: scoreBand(r.points), guess: r.guess, actual: r.actual })),
+  );
+  setReviewing(false);
   ui.summary.hidden = false;
   if (filed?.isRecord) renderCountryList();
 }
 
+/* -------------------------------------------------------------- review */
+
+/**
+ * Puts the finished run on the map, or takes it back off. Reviewing docks the
+ * summary to one side and hands the map back: the point is to look at where the
+ * pins landed, which a panel across the middle of the screen makes impossible.
+ */
+function setReviewing(on) {
+  state.reviewing = on;
+  if (!on) unpeek();
+  state.focused = null;
+  view.setReviewVisible(on);
+  if (on) view.unfocusReview();
+
+  ui.summary.classList.toggle('is-review', on);
+  ui.legend.hidden = !on;
+  ui.peek.hidden = !on;
+  ui.review.ariaPressed = String(on);
+  ui.review.classList.toggle('is-on', on);
+  ui.review.querySelector('.chip-text').textContent =
+    on ? 'Hide the pins' : 'Show every round on the map';
+  for (const row of ui.summary.querySelectorAll('.s-row')) row.classList.remove('is-focus');
+  if (on) refitReview();
+  else if (state.game) view.frameCountry(framing(state.game.country));
+}
+
+/**
+ * Frames the run in the part of the map the panel is not sitting on — beside it
+ * on a wide screen, above it on a phone, and the whole viewport once the panel
+ * has been tucked away.
+ */
+function refitReview() {
+  const panel = ui.summary.querySelector('.panel');
+  const tucked = !ui.unpeek.hidden;
+  // Tucked away, the panel is gone but the pill that brings it back is not.
+  const box = tucked ? { width: 0, height: 74 } : panel.getBoundingClientRect();
+  view.setReviewPadding(
+    !tucked && window.innerWidth > 560
+      ? { topLeft: [box.width + 46, 70], bottomRight: [60, 70] }
+      : { topLeft: [40, 70], bottomRight: [40, box.height + 46] },
+  );
+  if (state.focused === null) view.fitReview();
+  else view.focusReview(state.focused);
+}
+
+/** Singles out one round; clicking the same row again zooms back out to all. */
+function focusRound(index) {
+  if (!state.reviewing) setReviewing(true);
+  const same = state.focused === index;
+  state.focused = same ? null : index;
+
+  for (const row of ui.summary.querySelectorAll('.s-row')) {
+    row.classList.toggle('is-focus', Number(row.dataset.round) === state.focused);
+  }
+  if (same) view.unfocusReview();
+  refitReview();
+}
+
+/** Tucks the panel away so nothing at all is over the map. */
+function peek() {
+  ui.summary.classList.add('is-peeking');
+  ui.unpeek.hidden = false;
+  ui.unpeek.focus();
+  refitReview();
+}
+
+function unpeek() {
+  const wasTucked = !ui.unpeek.hidden;
+  ui.summary.classList.remove('is-peeking');
+  ui.unpeek.hidden = true;
+  if (wasTucked && state.reviewing) refitReview();
+}
+
 function quitToMenu() {
   state.game = null;
+  setReviewing(false);
+  view.clearReview();
   view.clearRound();
   view.setPicking(false);
+  // The last round's own pins go: the run about to be drawn includes them, and
+  // two markers on one spot in different colours reads as a bug.
+  view.clearRound();
   ui.hud.hidden = true;
   ui.actionbar.hidden = true;
   ui.result.hidden = true;
@@ -447,6 +555,9 @@ function wireEvents() {
   el('btn-quit').addEventListener('click', quitToMenu);
   el('btn-again').addEventListener('click', startGame);
   el('btn-menu').addEventListener('click', quitToMenu);
+  ui.review.addEventListener('click', () => setReviewing(!state.reviewing));
+  ui.peek.addEventListener('click', peek);
+  ui.unpeek.addEventListener('click', unpeek);
 
   wireDifficulties();
   wireSorts();
@@ -458,8 +569,18 @@ function wireEvents() {
   // Enter/Space advances the round without hunting for the button. There is
   // nothing to confirm any more, so it only moves on from a revealed round.
   document.addEventListener('keydown', (event) => {
+    // On the finish screen Escape backs out one step at a time: the tucked-away
+    // panel first, then the focused round, then the pins.
+    if (event.key === 'Escape' && !ui.summary.hidden) {
+      if (!ui.unpeek.hidden) unpeek();
+      else if (state.focused !== null) focusRound(state.focused);
+      else if (state.reviewing) setReviewing(false);
+      return;
+    }
     if (event.key !== 'Enter' && event.key !== ' ') return;
     if (event.target instanceof HTMLInputElement) return;
+    // The finish screen has its own buttons to press; the round is over.
+    if (!ui.summary.hidden) return;
     if (state.game?.phase !== 'revealed') return;
     event.preventDefault();
     nextRound();

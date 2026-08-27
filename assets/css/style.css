@@ -129,6 +129,8 @@ html, body {
 .field-head > label,
 .field-label,
 .country-list li,
+.s-row,
+.legend,
 .summary-actions {
   -webkit-user-select: none;
   user-select: none;
@@ -403,16 +405,155 @@ html, body {
 .summary-list li {
   counter-increment: r;
   display: grid;
-  grid-template-columns: 20px 1fr auto auto;
+  grid-template-columns: 20px 1fr;
   align-items: baseline;
   gap: 10px;
-  padding: 7px 2px;
   border-top: 1px solid var(--edge);
   font-size: 13px;
 }
-.summary-list li::before { content: counter(r); color: var(--muted); font-size: 11px; }
+.summary-list li::before { content: counter(r); color: var(--muted); font-size: 11px; padding-top: 7px; }
+/* Each round is a button: it is how you get to that miss on the map. The band
+   colour lives on a hairline down the left rather than on the text, so twenty
+   rows do not turn into a traffic light. */
+.s-row {
+  appearance: none;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 6px;
+  margin: 0 -4px;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.s-row:hover { background: rgba(255, 255, 255, 0.07); }
+.s-row.score-good { border-left-color: rgba(71, 209, 139, 0.55); }
+.s-row.score-mid { border-left-color: rgba(255, 200, 87, 0.55); }
+.s-row.score-bad { border-left-color: rgba(255, 107, 107, 0.7); }
+.s-row.is-focus { background: rgba(76, 194, 255, 0.16); }
+.s-row.is-focus.score-good { border-left-color: var(--good); }
+.s-row.is-focus.score-mid { border-left-color: var(--warn); }
+.s-row.is-focus.score-bad { border-left-color: var(--bad); }
+.s-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .summary-list .s-dist { color: var(--muted); font-variant-numeric: tabular-nums; }
 .summary-list .s-pts { font-weight: 700; font-variant-numeric: tabular-nums; }
+.summary-list .s-pts.score-good { color: var(--good); }
+.summary-list .s-pts.score-mid { color: var(--warn); }
+.summary-list .s-pts.score-bad { color: var(--bad); }
+
+.summary-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.summary-head .summary-title { margin: 0; }
+
+/* ---------- review mode ---------- */
+
+.chip {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--edge);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.chip:hover { background: rgba(255, 255, 255, 0.11); }
+.chip-ghost { color: var(--muted); padding: 5px 11px; font-size: 11px; }
+.chip-ghost:hover { color: var(--text); }
+.chip-review { margin-top: 12px; }
+.chip-review.is-on { border-color: var(--accent); background: rgba(76, 194, 255, 0.16); }
+/* Three overlapping dots, the run in miniature. */
+.chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--bad);
+  box-shadow: 6px 0 0 -1px var(--warn), 12px 0 0 -2px var(--good);
+  margin-right: 12px;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.legend-item, .legend-note { display: inline-flex; align-items: center; gap: 5px; }
+.legend-note { gap: 5px; }
+.key {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.key-good { background: var(--good); }
+.key-mid { background: var(--warn); }
+.key-bad { background: var(--bad); }
+.key-ring { border: 2px solid var(--muted); background: none; }
+.key-fill { background: var(--muted); margin-left: 6px; }
+
+/* Reviewing: the panel steps aside and the map is live underneath it. */
+#summary.is-review {
+  place-items: start;
+  background: linear-gradient(90deg, rgba(7, 11, 18, 0.75), rgba(7, 11, 18, 0) 60%);
+  pointer-events: none;
+  overflow: visible;
+}
+#summary.is-review > .panel {
+  pointer-events: auto;
+  width: min(330px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  animation: slide-in 0.2s ease-out;
+}
+#summary.is-review .summary-list { max-height: none; }
+#summary.is-peeking > .panel { display: none; }
+#summary.is-peeking { background: none; }
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #summary.is-review > .panel { animation: none; }
+}
+
+/* The way back to a panel that has been tucked away. */
+.peek-btn {
+  position: fixed;
+  left: 50%;
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 950;
+  appearance: none;
+  border: 1px solid transparent;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+}
+.peek-btn:hover { background: #6fd0ff; }
 .summary-actions { display: flex; gap: 8px; }
 .summary-actions .btn { flex: 1; }
 
@@ -427,6 +568,20 @@ html, body {
 }
 .pin-guess { background: var(--accent); }
 .pin-actual { background: var(--good); }
+/* Review pins. Colour is the round's score; shape is which end of it this is —
+   a ring for where you guessed, a solid dot for where the place really is. */
+.pin-review {
+  border-color: var(--band);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.7);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.pin-review-guess { background: rgba(7, 11, 18, 0.55); }
+.pin-review-actual { background: var(--band); }
+.review-icon.is-dimmed { opacity: 0.3; }
+.review-icon.is-dimmed .pin-label-review { display: none; }
+.review-icon.is-focus { z-index: 700 !important; }
+.review-icon.is-focus .pin-review { transform: scale(1.35); border-width: 3px; }
+
 .pin-label {
   position: absolute;
   left: 50%;
@@ -440,8 +595,22 @@ html, body {
   background: rgba(7, 11, 18, 0.85);
   border: 1px solid var(--edge);
 }
+.pin-label-review {
+  top: -20px;
+  font-size: 10px;
+  color: var(--band);
+  border-color: color-mix(in srgb, var(--band) 45%, transparent);
+}
 
 @media (max-width: 560px) {
+  /* No room beside the map on a phone, so the panel docks to the bottom edge
+     instead and keeps the top half of the screen clear for the pins. */
+  #summary.is-review {
+    place-items: end stretch;
+    background: linear-gradient(0deg, rgba(7, 11, 18, 0.8), rgba(7, 11, 18, 0) 55%);
+  }
+  #summary.is-review > .panel { width: 100%; max-height: 52dvh; }
+  #summary.is-review .summary-list { max-height: none; }
   .hud { grid-template-columns: auto 1fr auto; }
   .hud-country { font-size: 13px; }
   .panel { padding: 16px; }
