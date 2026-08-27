@@ -109,13 +109,30 @@
   <!-- End-of-game summary -->
   <section id="summary" class="overlay" hidden>
     <div class="panel">
-      <h2 id="summary-title" class="summary-title">Round up</h2>
+      <div class="summary-head">
+        <h2 id="summary-title" class="summary-title">Round up</h2>
+        <!-- Only shown once the run is on the map: the panel is in the way there. -->
+        <button id="btn-peek" class="chip chip-ghost" type="button" hidden title="Hide this panel and look at the map">Hide</button>
+      </div>
       <div class="summary-total">
         <span id="summary-avg" class="summary-avg">0</span>
         <span class="result-outof">avg / 100</span>
       </div>
       <p id="summary-line" class="brand-sub"></p>
       <p id="summary-best" class="summary-best" aria-live="polite"></p>
+
+      <button id="btn-review" class="chip chip-review" type="button" aria-pressed="false">
+        <span class="chip-dot"></span><span class="chip-text">Show every round on the map</span>
+      </button>
+
+      <!-- What the colours and the two pin shapes mean, shown with the run -->
+      <div id="summary-legend" class="legend" hidden>
+        <span class="legend-item"><i class="key key-good"></i>70+</span>
+        <span class="legend-item"><i class="key key-mid"></i>35–69</span>
+        <span class="legend-item"><i class="key key-bad"></i>under 35</span>
+        <span class="legend-note"><i class="key key-ring"></i>your pin <i class="key key-fill"></i>the place</span>
+      </div>
+
       <ol id="summary-list" class="summary-list"></ol>
       <div class="summary-actions">
         <button id="btn-again" class="btn btn-primary" type="button">Play again</button>
@@ -123,6 +140,9 @@
       </div>
     </div>
   </section>
+
+  <!-- Brings the summary back once it has been tucked away to see the map -->
+  <button id="btn-unpeek" class="peek-btn" type="button" hidden>Results</button>
 
   <script src="vendor/leaflet/leaflet.js"></script>
   <script type="module" src="assets/js/main.js"></script>
