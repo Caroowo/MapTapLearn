@@ -15,6 +15,9 @@ const BORDER_LAYERS = [
   { name: 'states', url: 'data/borders/states.json', style: { color: '#ffffff', weight: 1.1, opacity: 0.7, dashArray: '5 4' } },
 ];
 
+/** Past this many places the study screen's labels would overlap into mush. */
+const LABEL_LIMIT = 40;
+
 /** Score bands, in the same colours the summary list scores them with. */
 const BAND_COLOR = {
   'score-good': '#47d18b',
@@ -46,6 +49,21 @@ function reviewDot(kind, band, label) {
     html:
       `<div class="pin pin-review pin-review-${kind}" style="--band:${colour}"></div>` +
       (label ? `<span class="pin-label pin-label-review" style="--band:${colour}">${escapeHtml(label)}</span>` : ''),
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+}
+
+/**
+ * A place on the study screen. One colour, one shape: nothing here has been
+ * guessed, so there is nothing for a second colour to mean.
+ */
+function placeDot(label, crowded) {
+  return L.divIcon({
+    className: `preview-icon${crowded ? ' is-crowded' : ''}`,
+    html:
+      `<div class="pin pin-place"></div>` +
+      `<span class="pin-label pin-label-place">${escapeHtml(label)}</span>`,
     iconSize: [14, 14],
     iconAnchor: [7, 7],
   });
@@ -83,6 +101,8 @@ export class MapView {
 
     this.review = null;       // layer group of every round, once a game is over
     this.reviewPairs = [];    // per round: {line, guess, actual}
+    this.preview = null;      // layer group of a country's places, before a game
+    this.previewMarkers = [];
     // How much of the viewport the summary panel is sitting on, so a fit puts
     // the run in the part of the map you can actually see.
     this.reviewPad = { topLeft: [60, 80], bottomRight: [60, 120] };
@@ -246,6 +266,76 @@ export class MapView {
       this.review.addLayer(pair.actual);
     }
     this.review.addTo(this.map);
+  }
+
+  /* ------------------------------------------------------------ preview */
+
+  /**
+   * Lays a country's pool out on the map to be studied: just the places, in one
+   * colour. Nothing here is scored, so there is no second pin and no line — the
+   * only thing to read is where each place sits.
+   *
+   * Labels are dropped once a pool is too big for them to be anything but a
+   * wall of text; the focused place still names itself.
+   *
+   * @param {Array<{name:string, lat:number, lon:number}>} places
+   */
+  showPreview(places) {
+    this.clearPreview();
+    const crowded = places.length > LABEL_LIMIT;
+    this.preview = L.layerGroup();
+    this.previewMarkers = places.map((place) =>
+      L.marker([place.lat, place.lon], {
+        icon: placeDot(place.name, crowded),
+        keyboard: false,
+        interactive: false,
+      }),
+    );
+    for (const marker of this.previewMarkers) this.preview.addLayer(marker);
+    this.preview.addTo(this.map);
+  }
+
+  /** Frames the whole pool. */
+  fitPreview({ animate = true } = {}) {
+    if (!this.previewMarkers.length) return;
+    const bounds = L.latLngBounds(this.previewMarkers.map((m) => m.getLatLng()));
+    this.map.fitBounds(bounds, {
+      paddingTopLeft: this.reviewPad.topLeft,
+      paddingBottomRight: this.reviewPad.bottomRight,
+      maxZoom: 11,
+      animate,
+    });
+  }
+
+  /** Zooms to one place and lifts it above the rest. */
+  focusPreview(index) {
+    const marker = this.previewMarkers[index];
+    if (!marker) return;
+    for (const [i, other] of this.previewMarkers.entries()) {
+      const on = i === index;
+      other.getElement()?.classList.toggle('is-dimmed', !on);
+      other.getElement()?.classList.toggle('is-focus', on);
+    }
+    const point = marker.getLatLng();
+    this.map.fitBounds(L.latLngBounds(point, point), {
+      paddingTopLeft: this.reviewPad.topLeft,
+      paddingBottomRight: this.reviewPad.bottomRight,
+      maxZoom: 10,
+      animate: true,
+    });
+  }
+
+  /** Back to every place weighted the same. */
+  unfocusPreview() {
+    for (const marker of this.previewMarkers) {
+      marker.getElement()?.classList.remove('is-dimmed', 'is-focus');
+    }
+  }
+
+  clearPreview() {
+    if (this.preview) this.map.removeLayer(this.preview);
+    this.preview = null;
+    this.previewMarkers = [];
   }
 
   /** Keeps fits clear of whatever chrome is currently over the map. */

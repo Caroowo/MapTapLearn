@@ -25,6 +25,10 @@ const el = (id) => document.getElementById(id);
 const ui = {
   menu: el('menu'),
   summary: el('summary'),
+  preview: el('preview'),
+  previewList: el('preview-list'),
+  previewBtn: el('btn-preview'),
+  previewPeek: el('btn-preview-peek'),
   hud: el('hud'),
   actionbar: el('actionbar'),
   result: el('result'),
@@ -54,6 +58,7 @@ const state = {
   game: null,
   reviewing: false,    // the finished run is drawn on the map
   focused: null,       // the round singled out of that run, if any
+  preview: null,       // the pool being studied on the map, if any
 };
 
 /** A short run is practice: it plays a random slice, so it sets no records. */
@@ -195,6 +200,8 @@ function refreshMenu() {
     ui.roundsValue.textContent = '';
     ui.start.disabled = true;
     ui.start.textContent = 'Pick a country';
+    ui.previewBtn.disabled = true;
+    ui.previewBtn.textContent = 'Preview its locations';
     return;
   }
 
@@ -219,6 +226,10 @@ function refreshMenu() {
   }
   ui.start.disabled = false;
   ui.start.textContent = `Play ${country.name}`;
+  ui.previewBtn.disabled = false;
+  // The preview shows the pool, not the run: a shortened game still asks about
+  // the biggest places, which is what the slider cuts down to.
+  ui.previewBtn.textContent = `Preview ${state.rounds} location${state.rounds === 1 ? '' : 's'}`;
 }
 
 /**
@@ -301,6 +312,7 @@ async function startGame() {
 
   ui.menu.hidden = true;
   ui.summary.hidden = true;
+  closePreview();
   setReviewing(false);
   view.clearReview();
   ui.hud.hidden = false;
@@ -511,23 +523,148 @@ function focusRound(index) {
   refitReview();
 }
 
+/** Whichever panel is currently docked beside the map, if either is. */
+function openPanel() {
+  if (!ui.preview.hidden) return ui.preview;
+  if (!ui.summary.hidden && state.reviewing) return ui.summary;
+  return null;
+}
+
+/** Re-frames whatever the open panel is showing, around the panel. */
+function refit() {
+  if (!ui.preview.hidden) refitPreview();
+  else if (state.reviewing) refitReview();
+}
+
 /** Tucks the panel away so nothing at all is over the map. */
 function peek() {
-  ui.summary.classList.add('is-peeking');
+  const panel = openPanel();
+  if (!panel) return;
+  panel.classList.add('is-peeking');
+  // The pill is the way back, so it says what it brings back.
+  ui.unpeek.textContent = panel === ui.preview ? 'Locations' : 'Results';
   ui.unpeek.hidden = false;
   ui.unpeek.focus();
-  refitReview();
+  refit();
 }
 
 function unpeek() {
   const wasTucked = !ui.unpeek.hidden;
   ui.summary.classList.remove('is-peeking');
+  ui.preview.classList.remove('is-peeking');
   ui.unpeek.hidden = true;
-  if (wasTucked && state.reviewing) refitReview();
+  if (wasTucked && openPanel()) refit();
+}
+
+/* ------------------------------------------------------------- preview */
+
+/**
+ * The study screen: the country's pool on the map with nothing scored, so you
+ * can learn where the places are before being asked. It borrows the finish
+ * screen's shape — a docked list, a row per place, click one to fly to it —
+ * minus everything about a run that hasn't happened yet.
+ */
+async function openPreview() {
+  if (!state.selected) return;
+  const label = ui.previewBtn.textContent;
+  ui.previewBtn.disabled = true;
+  ui.previewBtn.textContent = 'Loading…';
+
+  let country;
+  try {
+    country = await loadCountry(state.selected.code);
+  } catch (err) {
+    ui.menuSummary.textContent = `Could not load ${state.selected.name}: ${err.message}`;
+    ui.previewBtn.textContent = label;
+    refreshMenu();
+    return;
+  }
+  // Picking a country while the fetch was in flight would otherwise open the
+  // wrong one's places.
+  if (country.code !== state.selected.code) {
+    refreshMenu();
+    return;
+  }
+
+  // The same slice the round would ask about: the biggest places first, in
+  // population order rather than shuffled — this screen is for reading, and a
+  // list you can find a place in beats a list that mimics the game's order.
+  const places = pool(country, state.difficulty).slice(0, state.rounds);
+  state.preview = { country, difficulty: state.difficulty, places, focused: null };
+
+  el('preview-title').textContent = `${country.name} · ${places.length} place${places.length === 1 ? '' : 's'}`;
+  el('preview-line').textContent =
+    `${state.difficulty} · biggest first. Nothing here is scored.`;
+
+  const list = ui.previewList;
+  list.innerHTML = '';
+  for (const [i, place] of places.entries()) {
+    const people = formatPopulation(place.pop);
+    const li = document.createElement('li');
+    li.innerHTML =
+      `<button type="button" class="s-row" data-place="${i}">` +
+      `<span class="s-name"></span>` +
+      `<span class="s-dist">${people === null ? '' : people}</span>` +
+      `</button>`;
+    // Place names come from the dataset, so they go in as text, never markup.
+    li.querySelector('.s-name').textContent = place.name;
+    li.querySelector('.s-row').addEventListener('click', () => focusPlace(i));
+    list.append(li);
+  }
+
+  view.clearRound();
+  view.clearReview();
+  view.showPreview(places);
+  ui.menu.hidden = true;
+  ui.preview.hidden = false;
+  refreshMenu();
+  refitPreview();
+}
+
+/** Frames the pool in the part of the map the panel is not sitting on. */
+function refitPreview() {
+  const panel = ui.preview.querySelector('.panel');
+  const tucked = !ui.unpeek.hidden;
+  const box = tucked ? { width: 0, height: 74 } : panel.getBoundingClientRect();
+  view.setReviewPadding(
+    !tucked && window.innerWidth > 560
+      ? { topLeft: [box.width + 46, 70], bottomRight: [60, 70] }
+      : { topLeft: [40, 70], bottomRight: [40, box.height + 46] },
+  );
+  if (state.preview?.focused === null) view.fitPreview();
+  else view.focusPreview(state.preview.focused);
+}
+
+/** Singles out one place; clicking the same row again zooms back out to all. */
+function focusPlace(index) {
+  if (!state.preview) return;
+  const same = state.preview.focused === index;
+  state.preview.focused = same ? null : index;
+
+  for (const row of ui.previewList.querySelectorAll('.s-row')) {
+    row.classList.toggle('is-focus', Number(row.dataset.place) === state.preview.focused);
+  }
+  if (same) view.unfocusPreview();
+  refitPreview();
+}
+
+function closePreview() {
+  state.preview = null;
+  view.clearPreview();
+  unpeek();
+  ui.preview.hidden = true;
+}
+
+function previewToMenu() {
+  closePreview();
+  ui.menu.hidden = false;
+  if (state.selected) view.frameCountry(framing(state.selected));
+  refreshMenu();
 }
 
 function quitToMenu() {
   state.game = null;
+  closePreview();
   setReviewing(false);
   view.clearReview();
   view.clearRound();
@@ -557,7 +694,11 @@ function wireEvents() {
   el('btn-menu').addEventListener('click', quitToMenu);
   ui.review.addEventListener('click', () => setReviewing(!state.reviewing));
   ui.peek.addEventListener('click', peek);
+  ui.previewPeek.addEventListener('click', peek);
   ui.unpeek.addEventListener('click', unpeek);
+  ui.previewBtn.addEventListener('click', openPreview);
+  el('btn-preview-play').addEventListener('click', startGame);
+  el('btn-preview-back').addEventListener('click', previewToMenu);
 
   wireDifficulties();
   wireSorts();
@@ -569,6 +710,14 @@ function wireEvents() {
   // Enter/Space advances the round without hunting for the button. There is
   // nothing to confirm any more, so it only moves on from a revealed round.
   document.addEventListener('keydown', (event) => {
+    // On the study screen Escape backs out one step at a time too: the
+    // tucked-away panel, then the place singled out, then the screen itself.
+    if (event.key === 'Escape' && !ui.preview.hidden) {
+      if (!ui.unpeek.hidden) unpeek();
+      else if (state.preview?.focused !== null) focusPlace(state.preview.focused);
+      else previewToMenu();
+      return;
+    }
     // On the finish screen Escape backs out one step at a time: the tucked-away
     // panel first, then the focused round, then the pins.
     if (event.key === 'Escape' && !ui.summary.hidden) {
@@ -579,16 +728,27 @@ function wireEvents() {
     }
     if (event.key !== 'Enter' && event.key !== ' ') return;
     if (event.target instanceof HTMLInputElement) return;
-    // The finish screen has its own buttons to press; the round is over.
-    if (!ui.summary.hidden) return;
+    // The finish and study screens have their own buttons to press.
+    if (!ui.summary.hidden || !ui.preview.hidden) return;
     if (state.game?.phase !== 'revealed') return;
     event.preventDefault();
     nextRound();
   });
 }
 
+/** A rotated phone changes which side of the map the panel is on. */
+function wireResize() {
+  let timer = null;
+  window.addEventListener('resize', () => {
+    if (!openPanel()) return;
+    clearTimeout(timer);
+    timer = setTimeout(refit, 150);
+  });
+}
+
 async function boot() {
   wireEvents();
+  wireResize();
   try {
     const index = await loadIndex();
     state.countries = index.countries;

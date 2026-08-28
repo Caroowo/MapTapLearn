@@ -102,7 +102,27 @@
       <p id="menu-summary" class="menu-summary"></p>
       <p id="menu-best" class="menu-best"></p>
       <button id="btn-start" class="btn btn-primary btn-block" type="button" disabled>Pick a country</button>
+      <!-- A look at the places before playing them: same map, no scores. -->
+      <button id="btn-preview" class="btn btn-block btn-quiet" type="button" disabled>Preview its locations</button>
       <p class="credit">Imagery &copy; Esri &middot; data <span id="data-source">…</span></p>
+    </div>
+  </section>
+
+  <!-- Study screen: the pool laid out on the map, before any of it is played -->
+  <section id="preview" class="overlay is-review" hidden>
+    <div class="panel">
+      <div class="summary-head">
+        <h2 id="preview-title" class="summary-title">Locations</h2>
+        <button id="btn-preview-peek" class="chip chip-ghost" type="button" title="Hide this panel and look at the map">Hide</button>
+      </div>
+      <p id="preview-line" class="brand-sub"></p>
+      <p id="preview-hint" class="summary-best">Tap a place to zoom to it.</p>
+
+      <ol id="preview-list" class="summary-list preview-list"></ol>
+      <div class="summary-actions">
+        <button id="btn-preview-play" class="btn btn-primary" type="button">Play these</button>
+        <button id="btn-preview-back" class="btn" type="button">Back</button>
+      </div>
     </div>
   </section>
 
@@ -141,7 +161,7 @@
     </div>
   </section>
 
-  <!-- Brings the summary back once it has been tucked away to see the map -->
+  <!-- Brings the open panel back once it has been tucked away to see the map -->
   <button id="btn-unpeek" class="peek-btn" type="button" hidden>Results</button>
 
   <script src="vendor/leaflet/leaflet.js"></script>

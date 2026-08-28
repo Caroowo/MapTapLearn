@@ -52,6 +52,22 @@ static host, including GitHub Pages.
 4. **Play.** One click on the map is the guess — it drops the pin and scores it
    at once, with no confirm step. `Enter` or `Space` moves on to the next round.
 
+### Preview
+
+**Preview N locations**, under the play button, opens the pool on the map before
+you play it: every place the run would ask about, pinned and named, with nothing
+scored. It is the finish screen's shape — a list docked beside the map, a row per
+place, click a row to fly to it and click it again to zoom back out — minus the
+run, so there is one pin per place instead of a guess, an answer and a line
+between them. `Hide` tucks the panel away for a clear map, and `Escape` backs out
+a step at a time: the tucked-away panel, then the place you singled out, then the
+screen. **Play these** starts the run you were just looking at.
+
+The list is in population order rather than the game's shuffled one — this screen
+is for reading, and a list you can find a place in beats one that mimics the
+round order. Past 40 places the labels would overlap into mush, so a big pool
+names only the place you have singled out.
+
 ### Scoring
 
 Anything within **15 km counts as dead on** and scores 100. Landing that close
@@ -248,12 +264,12 @@ fit the existing round loop — they only need a different pool builder in
 ## Layout
 
 ```
-index.html              markup for menu, HUD, result and summary
+index.html              markup for menu, HUD, result, preview and summary
 assets/js/main.js       menu, game loop, result reporting
 assets/js/records.js    personal bests in localStorage
 assets/js/data.js       dataset loading, difficulty pools, round draw
 assets/js/scoring.js    great-circle distance, 1–100 score
-assets/js/mapview.js    Leaflet wrapper: basemap, pins, reveal
+assets/js/mapview.js    Leaflet wrapper: basemap, pins, reveal, review/preview
 scripts/build-borders.mjs   Natural Earth → data/borders/
 scripts/build-dataset.mjs   GeoNames → data/
 scripts/scrape-maptap.mjs   maptap.gg → data/
